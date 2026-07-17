@@ -10,7 +10,7 @@ import 'ftp_server_form_screen.dart';
 /// ===============================================================
 /// OpenBackup
 /// File : ftp_server_list_screen.dart
-/// Version : 1.1.0
+/// Version : 1.2.0
 /// Description : FTP Server List Screen
 /// ===============================================================
 
@@ -90,54 +90,113 @@ class _EmptyServerList extends StatelessWidget {
   }
 }
 
-class _FtpServerTile extends StatelessWidget {
+class _FtpServerTile extends ConsumerWidget {
   const _FtpServerTile({required this.server});
 
   final FtpServerModel server;
 
+  void _openEditForm(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => FtpServerFormScreen(server: server)),
+    );
+  }
+
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Delete FTP Server"),
+          content: Text('Delete "${server.name}" from your FTP servers?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("Cancel"),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text("Delete"),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete != true) {
+      return;
+    }
+
+    ref.read(ftpServerProvider.notifier).deleteServer(server.id);
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final username = server.isAnonymous ? 'Anonymous' : server.username;
 
-    return Container(
-      padding: const EdgeInsets.all(AppSizes.paddingM),
-      decoration: BoxDecoration(
-        color: AppColors.card,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(AppSizes.radiusL),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 26,
-            backgroundColor: AppColors.primary.withValues(alpha: 0.15),
-            child: const Icon(Icons.dns_rounded, color: AppColors.primary),
+        onTap: () => _openEditForm(context),
+        child: Ink(
+          padding: const EdgeInsets.all(AppSizes.paddingM),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(AppSizes.radiusL),
+            border: Border.all(color: AppColors.border),
           ),
-          const SizedBox(width: AppSizes.paddingM),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  server.name,
-                  style: Theme.of(context).textTheme.titleMedium,
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 26,
+                backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                child: const Icon(Icons.dns_rounded, color: AppColors.primary),
+              ),
+              const SizedBox(width: AppSizes.paddingM),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      server.name,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: AppSizes.paddingXS),
+                    Text(
+                      '${server.host}:${server.port} - $username',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textHint,
+                      ),
+                    ),
+                    const SizedBox(height: AppSizes.paddingXS),
+                    Text(
+                      server.remotePath,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: AppSizes.paddingXS),
-                Text(
-                  '${server.host}:${server.port} - $username',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(color: AppColors.textHint),
-                ),
-                const SizedBox(height: AppSizes.paddingXS),
-                Text(
-                  server.remotePath,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(width: AppSizes.paddingS),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: "Edit FTP Server",
+                    icon: const Icon(Icons.edit_rounded),
+                    onPressed: () => _openEditForm(context),
+                  ),
+                  IconButton(
+                    tooltip: "Delete FTP Server",
+                    icon: const Icon(Icons.delete_rounded),
+                    color: AppColors.error,
+                    onPressed: () => _confirmDelete(context, ref),
+                  ),
+                ],
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

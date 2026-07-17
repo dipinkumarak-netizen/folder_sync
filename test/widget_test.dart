@@ -7,6 +7,11 @@ void main() {
   testWidgets('App opens splash and navigates to dashboard', (
     WidgetTester tester,
   ) async {
+    tester.view.physicalSize = const Size(800, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     await tester.pumpWidget(const FtpBackupApp());
 
     expect(find.text('FTP Backup'), findsOneWidget);
@@ -41,5 +46,31 @@ void main() {
 
     expect(find.text('Test FTP'), findsOneWidget);
     expect(find.text('ftp.test.local:21 - backup_user'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Edit FTP Server'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit FTP Server'), findsOneWidget);
+
+    await tester.enterText(find.bySemanticsLabel('Server Name'), 'Office FTP');
+    await tester.drag(find.byType(ListView).last, const Offset(0, -240));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Update FTP Server'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Office FTP'), findsOneWidget);
+    expect(find.text('Test FTP'), findsNothing);
+
+    await tester.tap(find.byTooltip('Delete FTP Server'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Delete FTP Server'), findsOneWidget);
+
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('No FTP Servers'), findsOneWidget);
+    expect(find.text('Office FTP'), findsNothing);
   });
 }

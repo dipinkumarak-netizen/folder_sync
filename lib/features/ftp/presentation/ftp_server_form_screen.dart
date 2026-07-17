@@ -10,12 +10,14 @@ import '../providers/ftp_provider.dart';
 /// ===============================================================
 /// OpenBackup
 /// File : ftp_server_form_screen.dart
-/// Version : 1.1.0
+/// Version : 1.2.0
 /// Description : Add/Edit FTP Server Form
 /// ===============================================================
 
 class FtpServerFormScreen extends ConsumerStatefulWidget {
-  const FtpServerFormScreen({super.key});
+  const FtpServerFormScreen({super.key, this.server});
+
+  final FtpServerModel? server;
 
   @override
   ConsumerState<FtpServerFormScreen> createState() =>
@@ -34,6 +36,26 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
 
   bool _anonymousLogin = false;
   bool _showPassword = false;
+
+  bool get _isEditing => widget.server != null;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final server = widget.server;
+    if (server == null) {
+      return;
+    }
+
+    _nameController.text = server.name;
+    _hostController.text = server.host;
+    _portController.text = server.port.toString();
+    _userController.text = server.username;
+    _passwordController.text = server.password;
+    _remotePathController.text = server.remotePath;
+    _anonymousLogin = server.isAnonymous;
+  }
 
   @override
   void dispose() {
@@ -65,7 +87,7 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
 
     final remotePath = _remotePathController.text.trim();
     final server = FtpServerModel(
-      id: const Uuid().v4(),
+      id: widget.server?.id ?? const Uuid().v4(),
       name: _nameController.text.trim(),
       host: _hostController.text.trim(),
       port: int.parse(_portController.text.trim()),
@@ -73,9 +95,15 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
       password: _anonymousLogin ? '' : _passwordController.text,
       remotePath: remotePath.isEmpty ? '/' : remotePath,
       isAnonymous: _anonymousLogin,
+      isFavorite: widget.server?.isFavorite ?? false,
     );
 
-    ref.read(ftpServerProvider.notifier).addServer(server);
+    final notifier = ref.read(ftpServerProvider.notifier);
+    if (_isEditing) {
+      notifier.updateServer(server);
+    } else {
+      notifier.addServer(server);
+    }
 
     Navigator.pop(context);
   }
@@ -84,7 +112,9 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text("Add FTP Server")),
+      appBar: AppBar(
+        title: Text(_isEditing ? "Edit FTP Server" : "Add FTP Server"),
+      ),
       body: SafeArea(
         child: Form(
           key: _formKey,
@@ -177,7 +207,9 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
               FilledButton.icon(
                 onPressed: _saveServer,
                 icon: const Icon(Icons.save),
-                label: const Text("Save FTP Server"),
+                label: Text(
+                  _isEditing ? "Update FTP Server" : "Save FTP Server",
+                ),
               ),
             ],
           ),
