@@ -1,6 +1,6 @@
 import 'dart:collection';
 
-import '../models/ftp_server_model.dart';
+import '../ftp/models/ftp_server_model.dart';
 
 /// ===============================================================
 /// OpenBackup
@@ -30,7 +30,9 @@ class FtpMemoryRepository {
 
   /// Removes a server by id.
   bool remove(String id) {
-    return _servers.removeWhere((e) => e.id == id) > 0;
+    final exists = _servers.any((e) => e.id == id);
+    _servers.removeWhere((e) => e.id == id);
+    return exists;
   }
 
   /// Updates an existing server.

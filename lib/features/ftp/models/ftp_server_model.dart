@@ -1,9 +1,9 @@
-/// ===============================================================
-/// OpenBackup
-/// File : ftp_server_model.dart
-/// Version : 1.0.0
-/// Description : FTP Server Model
-/// ===============================================================
+// ===============================================================
+// OpenBackup
+// File : ftp_server_model.dart
+// Version : 1.0.0
+// Description : FTP Server Model
+// ===============================================================
 
 class FtpServerModel {
   final String id;

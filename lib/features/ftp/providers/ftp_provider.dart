@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/ftp_server_model.dart';
-import '../repositories/ftp_memory_repository.dart';
+import '../../repositories/ftp_memory_repository.dart';
 
 /// ===============================================================
 /// OpenBackup
@@ -47,7 +47,7 @@ class FtpServerNotifier extends StateNotifier<List<FtpServerModel>> {
 }
 
 final ftpServerProvider =
-StateNotifierProvider<FtpServerNotifier, List<FtpServerModel>>((ref) {
+    StateNotifierProvider<FtpServerNotifier, List<FtpServerModel>>((ref) {
   final repository = ref.watch(ftpRepositoryProvider);
   return FtpServerNotifier(repository);
 });

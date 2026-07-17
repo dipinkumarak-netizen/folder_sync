@@ -1,11 +1,11 @@
-/// ===============================================================
-/// OpenBackup
-/// File : app_sizes.dart
-/// Layer : Core
-/// Description : Global spacing, radius and sizing constants.
-/// Author : OpenBackup Contributors
-/// License : Apache 2.0
-/// ===============================================================
+// ===============================================================
+// OpenBackup
+// File : app_sizes.dart
+// Layer : Core
+// Description : Global spacing, radius and sizing constants.
+// Author : OpenBackup Contributors
+// License : Apache 2.0
+// ===============================================================
 
 class AppSizes {
   AppSizes._();
