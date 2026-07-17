@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:folder_sync/main.dart';
@@ -16,5 +17,29 @@ void main() {
 
     expect(find.text('System Status'), findsOneWidget);
     expect(find.text('Configure FTP connections'), findsOneWidget);
+
+    await tester.tap(find.text('Configure FTP connections'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('No FTP Servers'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Add FTP Server'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.bySemanticsLabel('Server Name'), 'Test FTP');
+    await tester.enterText(
+      find.bySemanticsLabel('Host / IP Address'),
+      'ftp.test.local',
+    );
+    await tester.enterText(find.bySemanticsLabel('Username'), 'backup_user');
+
+    await tester.drag(find.byType(ListView).last, const Offset(0, -240));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Save FTP Server'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Test FTP'), findsOneWidget);
+    expect(find.text('ftp.test.local:21 - backup_user'), findsOneWidget);
   });
 }

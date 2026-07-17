@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme/app_theme.dart';
 import 'screens/splash/splash_screen.dart';
@@ -14,13 +15,15 @@ class FtpBackupApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'FTP Backup',
-      debugShowCheckedModeBanner: false,
+    return ProviderScope(
+      child: MaterialApp(
+        title: 'FTP Backup',
+        debugShowCheckedModeBanner: false,
 
-      theme: AppTheme.darkTheme,
+        theme: AppTheme.darkTheme,
 
-      home: const SplashScreen(),
+        home: const SplashScreen(),
+      ),
     );
   }
 }
