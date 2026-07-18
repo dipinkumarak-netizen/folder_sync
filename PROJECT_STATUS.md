@@ -56,6 +56,7 @@ File Picker
 - FTP Memory Repository
 - FTP Provider
 - FTP Connection Testing
+- Local FTP Server Persistence
 
 ## Backup Module
 
@@ -64,6 +65,7 @@ File Picker
 - Local Folder Picker
 - Manual New-Files-Only FTP Backup
 - Backup Run Status Summary
+- Local Backup Job Persistence
 
 ---
 
@@ -128,7 +130,6 @@ Working Backup
 
 Pending:
 
-- Persistent Backup Jobs
 - Background Folder Watching
 - Scheduled Backup
 

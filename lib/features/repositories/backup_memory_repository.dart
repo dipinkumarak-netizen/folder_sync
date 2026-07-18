@@ -53,7 +53,7 @@ class BackupMemoryRepository {
     _loaded = true;
 
     try {
-      final file = await _storageFile();
+      final file = await _storageFile().timeout(const Duration(seconds: 1));
       if (!await file.exists()) {
         return;
       }
@@ -304,7 +304,7 @@ class BackupMemoryRepository {
 
   Future<void> _save() async {
     try {
-      final file = await _storageFile().timeout(const Duration(seconds: 1));
+      final file = await _storageFile();
       final encoded = jsonEncode(_jobs.map((job) => job.toJson()).toList());
       await file.writeAsString(encoded);
     } catch (_) {
