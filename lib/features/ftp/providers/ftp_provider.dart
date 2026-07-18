@@ -53,6 +53,12 @@ class FtpServerNotifier extends StateNotifier<List<FtpServerModel>> {
   Future<bool> testConnection(FtpServerModel server) {
     return _repository.testConnection(server);
   }
+
+  Future<FtpConnectionTestResult> testConnectionDetailed(
+    FtpServerModel server,
+  ) {
+    return _repository.testConnectionDetailed(server);
+  }
 }
 
 final ftpServerProvider =

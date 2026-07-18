@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/failure_message.dart';
 import '../../ftp/models/ftp_server_model.dart';
 import '../../history/models/history_entry_model.dart';
 import '../../history/providers/history_provider.dart';
@@ -257,10 +258,14 @@ class RestoreNotifier extends StateNotifier<RestoreState> {
           }
         },
       );
-    } catch (_) {
-      result = const RestoreRunResult(
+    } catch (error) {
+      result = RestoreRunResult(
         success: false,
-        message: 'Restore failed unexpectedly.',
+        message: FailureMessage.from(
+          error,
+          operation: 'Restore',
+          fallback: 'Restore failed unexpectedly.',
+        ),
         filesRestored: 0,
         filesSkipped: 0,
         filesOverwritten: 0,

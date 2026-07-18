@@ -2,6 +2,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../../core/utils/failure_message.dart';
 import '../../ftp/models/ftp_server_model.dart';
 import '../../history/models/history_entry_model.dart';
 import '../../history/providers/history_provider.dart';
@@ -106,10 +107,14 @@ class BackupJobNotifier extends StateNotifier<List<BackupJobModel>> {
         job: runningJob,
         ftpServer: ftpServer,
       );
-    } catch (_) {
+    } catch (error) {
       result = BackupRunResult(
         success: false,
-        message: 'Backup failed unexpectedly.',
+        message: FailureMessage.from(
+          error,
+          operation: 'Backup',
+          fallback: 'Backup failed unexpectedly.',
+        ),
         filesBackedUp: 0,
         bytesBackedUp: 0,
         backedUpRelativePaths: runningJob.backedUpRelativePaths,

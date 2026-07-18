@@ -7,6 +7,7 @@ import 'package:ftpconnect/ftpconnect.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
+import '../../core/utils/failure_message.dart';
 import '../backup/models/backup_job_model.dart';
 import '../ftp/models/ftp_server_model.dart';
 
@@ -131,10 +132,14 @@ class BackupMemoryRepository {
     final List<File> pendingFiles;
     try {
       pendingFiles = await _collectPendingFiles(localDirectory, job);
-    } catch (_) {
+    } catch (error) {
       return BackupRunResult(
         success: false,
-        message: 'Could not read the selected local folder.',
+        message: FailureMessage.from(
+          error,
+          operation: 'Backup',
+          fallback: 'Could not read the selected local folder.',
+        ),
         filesBackedUp: 0,
         bytesBackedUp: 0,
         backedUpRelativePaths: job.backedUpRelativePaths,
@@ -217,10 +222,14 @@ class BackupMemoryRepository {
         backedUpRelativePaths: backedUpPaths.toList()..sort(),
         runBackedUpRelativePaths: runBackedUpPaths..sort(),
       );
-    } catch (_) {
+    } catch (error) {
       return BackupRunResult(
         success: false,
-        message: 'Backup failed. Check the folder and FTP server.',
+        message: FailureMessage.from(
+          error,
+          operation: 'Backup',
+          fallback: 'Backup failed. Check the folder and FTP server.',
+        ),
         filesBackedUp: filesBackedUp,
         bytesBackedUp: bytesBackedUp,
         backedUpRelativePaths: backedUpPaths.toList()..sort(),

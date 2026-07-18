@@ -2,6 +2,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../../core/utils/failure_message.dart';
 import '../../ftp/models/ftp_server_model.dart';
 import '../../history/models/history_entry_model.dart';
 import '../../history/providers/history_provider.dart';
@@ -107,10 +108,14 @@ class SyncRuleNotifier extends StateNotifier<List<SyncRuleModel>> {
         rule: runningRule,
         ftpServer: ftpServer,
       );
-    } catch (_) {
-      result = const SyncRunResult(
+    } catch (error) {
+      result = SyncRunResult(
         success: false,
-        message: 'Synchronization failed unexpectedly.',
+        message: FailureMessage.from(
+          error,
+          operation: 'Synchronization',
+          fallback: 'Synchronization failed unexpectedly.',
+        ),
         filesChanged: 0,
         bytesChanged: 0,
       );
@@ -186,10 +191,14 @@ class SyncRuleNotifier extends StateNotifier<List<SyncRuleModel>> {
         rule: runningRule,
         ftpServer: ftpServer,
       );
-    } catch (_) {
-      result = const SyncRunResult(
+    } catch (error) {
+      result = SyncRunResult(
         success: false,
-        message: 'Protected delete failed unexpectedly.',
+        message: FailureMessage.from(
+          error,
+          operation: 'Protected delete',
+          fallback: 'Protected delete failed unexpectedly.',
+        ),
         filesChanged: 0,
         bytesChanged: 0,
       );

@@ -126,9 +126,9 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
     });
 
     final server = _buildServerFromForm();
-    final success = await ref
+    final result = await ref
         .read(ftpServerProvider.notifier)
-        .testConnection(server);
+        .testConnectionDetailed(server);
 
     if (!mounted) {
       return;
@@ -140,12 +140,8 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          success
-              ? "FTP connection successful."
-              : "Could not connect to the FTP server.",
-        ),
-        backgroundColor: success ? AppColors.success : AppColors.error,
+        content: Text(result.message),
+        backgroundColor: result.success ? AppColors.success : AppColors.error,
       ),
     );
   }

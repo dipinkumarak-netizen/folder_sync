@@ -7,6 +7,7 @@ import 'package:ftpconnect/ftpconnect.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
+import '../../core/utils/failure_message.dart';
 import '../ftp/models/ftp_server_model.dart';
 import '../sync/models/sync_rule_model.dart';
 
@@ -270,10 +271,14 @@ class SyncRuleRepository {
         bytesChanged: bytesChanged,
         fileReports: fileReports,
       );
-    } catch (_) {
-      return const SyncRunResult(
+    } catch (error) {
+      return SyncRunResult(
         success: false,
-        message: 'Synchronization failed. Check folders and FTP server.',
+        message: FailureMessage.from(
+          error,
+          operation: 'Synchronization',
+          fallback: 'Synchronization failed. Check folders and FTP server.',
+        ),
         filesChanged: 0,
         bytesChanged: 0,
       );
@@ -350,11 +355,15 @@ class SyncRuleRepository {
             : 'Preview found ${items.length} file(s) that would be deleted.',
         items: items,
       );
-    } catch (_) {
-      return const SyncDeletePreviewResult(
+    } catch (error) {
+      return SyncDeletePreviewResult(
         success: false,
-        message: 'Delete preview failed. Check folders and FTP server.',
-        items: [],
+        message: FailureMessage.from(
+          error,
+          operation: 'Delete preview',
+          fallback: 'Delete preview failed. Check folders and FTP server.',
+        ),
+        items: const [],
       );
     } finally {
       if (connected) {
@@ -459,10 +468,14 @@ class SyncRuleRepository {
         bytesChanged: bytesChanged,
         fileReports: fileReports,
       );
-    } catch (_) {
-      return const SyncRunResult(
+    } catch (error) {
+      return SyncRunResult(
         success: false,
-        message: 'Protected delete failed. Check folders and FTP server.',
+        message: FailureMessage.from(
+          error,
+          operation: 'Protected delete',
+          fallback: 'Protected delete failed. Check folders and FTP server.',
+        ),
         filesChanged: 0,
         bytesChanged: 0,
       );

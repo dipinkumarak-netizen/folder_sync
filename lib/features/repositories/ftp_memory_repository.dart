@@ -6,6 +6,7 @@ import 'dart:io';
 import 'package:ftpconnect/ftpconnect.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../core/utils/failure_message.dart';
 import '../ftp/models/ftp_server_model.dart';
 
 /// ===============================================================
@@ -116,6 +117,13 @@ class FtpMemoryRepository {
 
   /// Tests whether the FTP server can be reached and authenticated.
   Future<bool> testConnection(FtpServerModel server) async {
+    final result = await testConnectionDetailed(server);
+    return result.success;
+  }
+
+  Future<FtpConnectionTestResult> testConnectionDetailed(
+    FtpServerModel server,
+  ) async {
     final ftpConnect = FTPConnect(
       server.host,
       port: server.port,
@@ -128,17 +136,36 @@ class FtpMemoryRepository {
     try {
       connected = await ftpConnect.connect();
       if (!connected) {
-        return false;
+        return const FtpConnectionTestResult(
+          success: false,
+          message: 'Could not connect to the FTP server. Check host and port.',
+        );
       }
 
       final remotePath = server.remotePath.trim();
       if (remotePath.isEmpty || remotePath == '/') {
-        return true;
+        return const FtpConnectionTestResult(
+          success: true,
+          message: 'FTP connection successful.',
+        );
       }
 
-      return ftpConnect.changeDirectory(remotePath);
-    } catch (_) {
-      return false;
+      final changed = await ftpConnect.changeDirectory(remotePath);
+      return FtpConnectionTestResult(
+        success: changed,
+        message: changed
+            ? 'FTP connection successful.'
+            : 'FTP connected, but the remote folder was not available.',
+      );
+    } catch (error) {
+      return FtpConnectionTestResult(
+        success: false,
+        message: FailureMessage.from(
+          error,
+          operation: 'FTP connection test',
+          fallback: 'Could not connect to the FTP server.',
+        ),
+      );
     } finally {
       if (connected) {
         await ftpConnect.disconnect();
@@ -167,4 +194,11 @@ class FtpMemoryRepository {
       return;
     }
   }
+}
+
+class FtpConnectionTestResult {
+  final bool success;
+  final String message;
+
+  const FtpConnectionTestResult({required this.success, required this.message});
 }

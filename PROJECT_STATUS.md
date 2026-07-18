@@ -56,6 +56,7 @@ File Picker
 - FTP Memory Repository
 - FTP Provider
 - FTP Connection Testing
+- FTP Connection Failure Details
 - Local FTP Server Persistence
 
 ## Backup Module
@@ -132,6 +133,7 @@ File Picker
 - History Detail Screen
 - Per-Run File Report Foundation
 - Backup Run History Logging
+- Failure Reason Clarity
 - History Filters
 - Clear History Action
 

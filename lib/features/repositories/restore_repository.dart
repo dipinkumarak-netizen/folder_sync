@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:ftpconnect/ftpconnect.dart';
 import 'package:path/path.dart' as path;
 
+import '../../core/utils/failure_message.dart';
 import '../ftp/models/ftp_server_model.dart';
 
 /// ===============================================================
@@ -197,12 +198,16 @@ class RestoreRepository {
             : 'Preview found ${files.length} file(s).',
         files: files,
       );
-    } catch (_) {
-      return const RestorePreviewResult(
+    } catch (error) {
+      return RestorePreviewResult(
         success: false,
-        message:
-            'Restore preview failed. Check the remote folder and FTP server.',
-        files: [],
+        message: FailureMessage.from(
+          error,
+          operation: 'Restore preview',
+          fallback:
+              'Restore preview failed. Check the remote folder and FTP server.',
+        ),
+        files: const [],
       );
     } finally {
       if (connected) {
@@ -352,10 +357,14 @@ class RestoreRepository {
         overwrittenRelativePaths: overwrittenPaths,
         keptBothRelativePaths: keptBothPaths,
       );
-    } catch (_) {
-      return const RestoreRunResult(
+    } catch (error) {
+      return RestoreRunResult(
         success: false,
-        message: 'Restore failed. Check folders and FTP server.',
+        message: FailureMessage.from(
+          error,
+          operation: 'Restore',
+          fallback: 'Restore failed. Check folders and FTP server.',
+        ),
         filesRestored: 0,
         filesSkipped: 0,
         filesOverwritten: 0,
