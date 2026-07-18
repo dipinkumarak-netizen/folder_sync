@@ -217,6 +217,9 @@ class _AppInfoSection extends StatelessWidget {
         _InfoSettingTile(title: 'Version', value: AppStrings.appVersion),
         Divider(height: AppSizes.paddingL),
         _InfoSettingTile(title: 'Storage', value: 'Local device only'),
+        Divider(height: AppSizes.paddingL),
+        _InfoSettingTile(title: 'Creater', value: 'Dipin A K'),
+        _InfoSettingTile(title: ' ', value: 'Edumba'),
       ],
     );
   }
