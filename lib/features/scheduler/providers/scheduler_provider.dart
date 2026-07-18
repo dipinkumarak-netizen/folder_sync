@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../backup/models/backup_job_model.dart';
+import '../../backup/providers/backup_provider.dart';
 import '../../ftp/models/ftp_server_model.dart';
 import '../../ftp/providers/ftp_provider.dart';
 import '../../sync/models/sync_rule_model.dart';
@@ -29,6 +31,7 @@ class SchedulerService {
   static const Duration _homeWifiMinimumInterval = Duration(minutes: 15);
 
   final Ref _ref;
+  final Set<String> _runningJobIds = {};
   final Set<String> _runningRuleIds = {};
   Timer? _timer;
   bool _isTicking = false;
@@ -57,26 +60,8 @@ class SchedulerService {
       await _configureAndroidBackgroundSchedule();
 
       final ftpServers = _ref.read(ftpServerProvider);
-      final rules = _ref.read(syncRuleProvider);
-      for (final rule in rules) {
-        if (!await _shouldRunRule(rule)) {
-          continue;
-        }
-
-        final ftpServer = _findFtpServer(ftpServers, rule.ftpServerId);
-        if (ftpServer == null) {
-          continue;
-        }
-
-        _runningRuleIds.add(rule.id);
-        try {
-          await _ref
-              .read(syncRuleProvider.notifier)
-              .runRule(rule: rule, ftpServer: ftpServer);
-        } finally {
-          _runningRuleIds.remove(rule.id);
-        }
-      }
+      await _runDueBackupJobs(ftpServers);
+      await _runDueSyncRules(ftpServers);
     } finally {
       _isTicking = false;
     }
@@ -87,9 +72,76 @@ class SchedulerService {
     _timer = null;
   }
 
+  Future<void> _runDueBackupJobs(List<FtpServerModel> ftpServers) async {
+    final jobs = _ref.read(backupJobProvider);
+    for (final job in jobs) {
+      if (!_shouldRunBackupJob(job)) {
+        continue;
+      }
+
+      final ftpServer = _findFtpServer(ftpServers, job.ftpServerId);
+      if (ftpServer == null) {
+        continue;
+      }
+
+      _runningJobIds.add(job.id);
+      try {
+        await _ref
+            .read(backupJobProvider.notifier)
+            .runJob(job: job, ftpServer: ftpServer);
+      } finally {
+        _runningJobIds.remove(job.id);
+      }
+    }
+  }
+
+  Future<void> _runDueSyncRules(List<FtpServerModel> ftpServers) async {
+    final rules = _ref.read(syncRuleProvider);
+    for (final rule in rules) {
+      if (!await _shouldRunRule(rule)) {
+        continue;
+      }
+
+      final ftpServer = _findFtpServer(ftpServers, rule.ftpServerId);
+      if (ftpServer == null) {
+        continue;
+      }
+
+      _runningRuleIds.add(rule.id);
+      try {
+        await _ref
+            .read(syncRuleProvider.notifier)
+            .runRule(rule: rule, ftpServer: ftpServer);
+      } finally {
+        _runningRuleIds.remove(rule.id);
+      }
+    }
+  }
+
   Future<void> _loadRepositories() async {
+    await _ref.read(backupJobProvider.notifier).loadJobs();
     await _ref.read(ftpServerProvider.notifier).loadServers();
     await _ref.read(syncRuleProvider.notifier).loadRules();
+  }
+
+  bool _shouldRunBackupJob(BackupJobModel job) {
+    if (!job.enabled ||
+        job.status == BackupJobStatus.running ||
+        _runningJobIds.contains(job.id)) {
+      return false;
+    }
+
+    return switch (job.scheduleRule) {
+      BackupScheduleRule.manualOnly => false,
+      BackupScheduleRule.hourly => _isDue(
+        job.lastRunAt,
+        const Duration(hours: 1),
+      ),
+      BackupScheduleRule.daily => _isDue(
+        job.lastRunAt,
+        const Duration(days: 1),
+      ),
+    };
   }
 
   Future<bool> _shouldRunRule(SyncRuleModel rule) async {
@@ -111,24 +163,33 @@ class SchedulerService {
   }
 
   Future<void> _configureAndroidBackgroundSchedule() async {
+    final jobs = _ref.read(backupJobProvider);
     final rules = _ref.read(syncRuleProvider);
-    final hasAutomaticRules = rules.any(_isAutomaticRule);
-    if (!hasAutomaticRules) {
+    final hasAutomaticWork =
+        jobs.any(_isAutomaticJob) || rules.any(_isAutomaticRule);
+    if (!hasAutomaticWork) {
       await AndroidBackgroundSchedulerService.cancel();
       return;
     }
 
     await AndroidBackgroundSchedulerService.configure(
       enabled: true,
-      intervalMinutes: _backgroundIntervalMinutes(rules),
+      intervalMinutes: _backgroundIntervalMinutes(jobs, rules),
     );
+  }
+
+  bool _isAutomaticJob(BackupJobModel job) {
+    return job.enabled && job.scheduleRule != BackupScheduleRule.manualOnly;
   }
 
   bool _isAutomaticRule(SyncRuleModel rule) {
     return rule.enabled && rule.triggerRule != SyncTriggerRule.manualOnly;
   }
 
-  int _backgroundIntervalMinutes(List<SyncRuleModel> rules) {
+  int _backgroundIntervalMinutes(
+    List<BackupJobModel> jobs,
+    List<SyncRuleModel> rules,
+  ) {
     final hasHomeWifiRules = rules.any(
       (rule) =>
           _isAutomaticRule(rule) &&
@@ -138,10 +199,18 @@ class SchedulerService {
       return _homeWifiMinimumInterval.inMinutes;
     }
 
+    final hasHourlyJobs = jobs.any(
+      (job) =>
+          _isAutomaticJob(job) && job.scheduleRule == BackupScheduleRule.hourly,
+    );
     final hasHourlyRules = rules.any(
       (rule) =>
           _isAutomaticRule(rule) && rule.triggerRule == SyncTriggerRule.hourly,
     );
+    if (hasHourlyJobs) {
+      return 60;
+    }
+
     return hasHourlyRules ? 60 : const Duration(days: 1).inMinutes;
   }
 

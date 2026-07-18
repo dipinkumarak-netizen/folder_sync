@@ -36,6 +36,7 @@ class _BackupJobFormScreenState extends ConsumerState<BackupJobFormScreen> {
 
   String? _selectedFtpServerId;
   bool _enabled = true;
+  BackupScheduleRule _scheduleRule = BackupScheduleRule.manualOnly;
 
   bool get _isEditing => widget.job != null;
 
@@ -53,6 +54,7 @@ class _BackupJobFormScreenState extends ConsumerState<BackupJobFormScreen> {
     _remoteFolderController.text = job.remoteFolderPath;
     _selectedFtpServerId = job.ftpServerId;
     _enabled = job.enabled;
+    _scheduleRule = job.scheduleRule;
   }
 
   @override
@@ -101,6 +103,7 @@ class _BackupJobFormScreenState extends ConsumerState<BackupJobFormScreen> {
       ftpServerId: _selectedFtpServerId!,
       remoteFolderPath: remoteFolder.isEmpty ? '/' : remoteFolder,
       enabled: _enabled,
+      scheduleRule: _scheduleRule,
       status: existingJob?.status ?? BackupJobStatus.idle,
       lastRunAt: existingJob?.lastRunAt,
       lastMessage: existingJob?.lastMessage ?? 'Not run yet',
@@ -184,6 +187,23 @@ class _BackupJobFormScreenState extends ConsumerState<BackupJobFormScreen> {
                 decoration: _inputDecoration('Remote Folder', AppIcons.folder),
               ),
               const SizedBox(height: AppSizes.paddingM),
+              _ScheduleDropdown(
+                value: _scheduleRule,
+                inputDecoration: _inputDecoration(
+                  'Schedule',
+                  AppIcons.schedule,
+                ),
+                onChanged: (value) {
+                  if (value == null) {
+                    return;
+                  }
+
+                  setState(() {
+                    _scheduleRule = value;
+                  });
+                },
+              ),
+              const SizedBox(height: AppSizes.paddingM),
               SwitchListTile(
                 value: _enabled,
                 title: const Text('Enabled'),
@@ -207,6 +227,41 @@ class _BackupJobFormScreenState extends ConsumerState<BackupJobFormScreen> {
         ),
       ),
     );
+  }
+}
+
+class _ScheduleDropdown extends StatelessWidget {
+  const _ScheduleDropdown({
+    required this.value,
+    required this.inputDecoration,
+    required this.onChanged,
+  });
+
+  final BackupScheduleRule value;
+  final InputDecoration inputDecoration;
+  final ValueChanged<BackupScheduleRule?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<BackupScheduleRule>(
+      initialValue: value,
+      decoration: inputDecoration,
+      items: BackupScheduleRule.values.map((rule) {
+        return DropdownMenuItem<BackupScheduleRule>(
+          value: rule,
+          child: Text(_scheduleLabel(rule)),
+        );
+      }).toList(),
+      onChanged: onChanged,
+    );
+  }
+
+  String _scheduleLabel(BackupScheduleRule value) {
+    return switch (value) {
+      BackupScheduleRule.manualOnly => 'Manual Only',
+      BackupScheduleRule.hourly => 'Hourly',
+      BackupScheduleRule.daily => 'Daily',
+    };
   }
 }
 

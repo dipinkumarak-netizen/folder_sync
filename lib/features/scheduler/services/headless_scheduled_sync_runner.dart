@@ -1,7 +1,9 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
 
+import '../../backup/models/backup_job_model.dart';
 import '../../ftp/models/ftp_server_model.dart';
 import '../../history/models/history_entry_model.dart';
+import '../../repositories/backup_memory_repository.dart';
 import '../../repositories/ftp_memory_repository.dart';
 import '../../repositories/history_repository.dart';
 import '../../repositories/sync_rule_repository.dart';
@@ -16,53 +18,132 @@ import '../../sync/services/wifi_status_service.dart';
 /// ===============================================================
 
 class HeadlessScheduledSyncResult {
-  final int checkedRules;
-  final int executedRules;
-  final int failedRules;
+  final int checkedJobs;
+  final int executedJobs;
+  final int failedJobs;
+  final int checkedSyncRules;
+  final int executedSyncRules;
+  final int failedSyncRules;
 
   const HeadlessScheduledSyncResult({
-    required this.checkedRules,
-    required this.executedRules,
-    required this.failedRules,
+    required this.checkedJobs,
+    required this.executedJobs,
+    required this.failedJobs,
+    required this.checkedSyncRules,
+    required this.executedSyncRules,
+    required this.failedSyncRules,
   });
 
   String get message {
-    if (executedRules == 0) {
-      return 'No scheduled sync rules were due.';
+    final executedTotal = executedJobs + executedSyncRules;
+    final failedTotal = failedJobs + failedSyncRules;
+    if (executedTotal == 0) {
+      return 'No scheduled work was due.';
     }
 
-    if (failedRules == 0) {
-      return 'Ran $executedRules scheduled sync rule(s).';
+    if (failedTotal == 0) {
+      return 'Ran $executedTotal scheduled task(s).';
     }
 
-    return 'Ran $executedRules scheduled sync rule(s), $failedRules failed.';
+    return 'Ran $executedTotal scheduled task(s), $failedTotal failed.';
   }
 }
 
 class HeadlessScheduledSyncRunner {
   static const Duration _homeWifiMinimumInterval = Duration(minutes: 15);
 
+  final BackupMemoryRepository _backupRepository =
+      BackupMemoryRepository.instance;
   final FtpMemoryRepository _ftpRepository = FtpMemoryRepository.instance;
   final SyncRuleRepository _syncRepository = SyncRuleRepository.instance;
   final HistoryRepository _historyRepository = HistoryRepository.instance;
 
   Future<HeadlessScheduledSyncResult> runDueSyncRules() async {
+    await _backupRepository.load();
     await _ftpRepository.load();
     await _syncRepository.load();
     await _historyRepository.load();
 
     final ftpServers = _ftpRepository.getAll();
     final rules = _syncRepository.getAll();
-    var checkedRules = 0;
-    var executedRules = 0;
-    var failedRules = 0;
+    var checkedJobs = 0;
+    var executedJobs = 0;
+    var failedJobs = 0;
+    var checkedSyncRules = 0;
+    var executedSyncRules = 0;
+    var failedSyncRules = 0;
+
+    for (final job in _backupRepository.getAll()) {
+      if (job.scheduleRule == BackupScheduleRule.manualOnly) {
+        continue;
+      }
+
+      checkedJobs += 1;
+      if (!_shouldRunBackupJob(job)) {
+        continue;
+      }
+
+      final ftpServer = _findFtpServer(ftpServers, job.ftpServerId);
+      if (ftpServer == null) {
+        await _recordMissingBackupServer(job);
+        failedJobs += 1;
+        continue;
+      }
+
+      executedJobs += 1;
+      final runningJob = job.copyWith(
+        status: BackupJobStatus.running,
+        lastMessage: 'Scheduled backup is running...',
+      );
+      _backupRepository.update(runningJob);
+
+      final result = await _backupRepository.runBackup(
+        job: runningJob,
+        ftpServer: ftpServer,
+      );
+      if (!result.success) {
+        failedJobs += 1;
+      }
+
+      final completedJob = runningJob.copyWith(
+        status: result.success
+            ? BackupJobStatus.success
+            : BackupJobStatus.failed,
+        lastRunAt: DateTime.now(),
+        lastMessage: result.message,
+        lastFilesBackedUp: result.filesBackedUp,
+        totalFilesBackedUp:
+            runningJob.totalFilesBackedUp + result.filesBackedUp,
+        totalBytesBackedUp:
+            runningJob.totalBytesBackedUp + result.bytesBackedUp,
+        backedUpRelativePaths: result.backedUpRelativePaths,
+      );
+      _backupRepository.update(completedJob);
+      _historyRepository.add(
+        HistoryEntryModel(
+          id: '${completedJob.id}-${DateTime.now().microsecondsSinceEpoch}',
+          operationType: HistoryOperationType.backup,
+          status: result.success
+              ? HistoryEntryStatus.success
+              : HistoryEntryStatus.failed,
+          title: completedJob.name,
+          message: result.message,
+          sourcePath: completedJob.localFolderPath,
+          targetPath: '${ftpServer.name}:${completedJob.remoteFolderPath}',
+          relatedId: completedJob.id,
+          createdAt: DateTime.now(),
+          filesChanged: result.filesBackedUp,
+          bytesChanged: result.bytesBackedUp,
+        ),
+      );
+    }
 
     for (final rule in rules) {
       if (rule.triggerRule == SyncTriggerRule.manualOnly) {
         continue;
       }
 
-      checkedRules += 1;
+      checkedSyncRules += 1;
       if (!await _shouldRunRule(rule)) {
         continue;
       }
@@ -70,11 +151,11 @@ class HeadlessScheduledSyncRunner {
       final ftpServer = _findFtpServer(ftpServers, rule.ftpServerId);
       if (ftpServer == null) {
         await _recordMissingServer(rule);
-        failedRules += 1;
+        failedSyncRules += 1;
         continue;
       }
 
-      executedRules += 1;
+      executedSyncRules += 1;
       final runningRule = rule.copyWith(
         status: SyncRuleStatus.running,
         lastMessage: 'Scheduled synchronization is running...',
@@ -86,7 +167,7 @@ class HeadlessScheduledSyncRunner {
         ftpServer: ftpServer,
       );
       if (!result.success) {
-        failedRules += 1;
+        failedSyncRules += 1;
       }
 
       final completedRule = runningRule.copyWith(
@@ -117,14 +198,36 @@ class HeadlessScheduledSyncRunner {
       );
     }
 
+    await _backupRepository.flush();
     await _syncRepository.flush();
     await _historyRepository.flush();
 
     return HeadlessScheduledSyncResult(
-      checkedRules: checkedRules,
-      executedRules: executedRules,
-      failedRules: failedRules,
+      checkedJobs: checkedJobs,
+      executedJobs: executedJobs,
+      failedJobs: failedJobs,
+      checkedSyncRules: checkedSyncRules,
+      executedSyncRules: executedSyncRules,
+      failedSyncRules: failedSyncRules,
     );
+  }
+
+  bool _shouldRunBackupJob(BackupJobModel job) {
+    if (!job.enabled || job.status == BackupJobStatus.running) {
+      return false;
+    }
+
+    return switch (job.scheduleRule) {
+      BackupScheduleRule.manualOnly => false,
+      BackupScheduleRule.hourly => _isDue(
+        job.lastRunAt,
+        const Duration(hours: 1),
+      ),
+      BackupScheduleRule.daily => _isDue(
+        job.lastRunAt,
+        const Duration(days: 1),
+      ),
+    };
   }
 
   Future<bool> _shouldRunRule(SyncRuleModel rule) async {
@@ -197,6 +300,29 @@ class HeadlessScheduledSyncRunner {
         sourcePath: failedRule.localFolderPath,
         targetPath: failedRule.remoteFolderPath,
         relatedId: failedRule.id,
+        createdAt: DateTime.now(),
+      ),
+    );
+  }
+
+  Future<void> _recordMissingBackupServer(BackupJobModel job) async {
+    final failedJob = job.copyWith(
+      status: BackupJobStatus.failed,
+      lastRunAt: DateTime.now(),
+      lastMessage: 'Scheduled backup skipped because FTP server is missing.',
+      lastFilesBackedUp: 0,
+    );
+    _backupRepository.update(failedJob);
+    _historyRepository.add(
+      HistoryEntryModel(
+        id: '${failedJob.id}-${DateTime.now().microsecondsSinceEpoch}',
+        operationType: HistoryOperationType.backup,
+        status: HistoryEntryStatus.failed,
+        title: failedJob.name,
+        message: failedJob.lastMessage,
+        sourcePath: failedJob.localFolderPath,
+        targetPath: failedJob.remoteFolderPath,
+        relatedId: failedJob.id,
         createdAt: DateTime.now(),
       ),
     );

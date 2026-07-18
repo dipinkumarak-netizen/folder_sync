@@ -377,6 +377,10 @@ class _BackupJobTile extends ConsumerWidget {
             children: [
               _StatusChip(label: _statusLabel(job.status), color: statusColor),
               _StatusChip(
+                label: _scheduleLabel(job.scheduleRule),
+                color: AppColors.schedule,
+              ),
+              _StatusChip(
                 label: '${job.totalFilesBackedUp} files',
                 color: AppColors.info,
               ),
@@ -441,6 +445,14 @@ class _BackupJobTile extends ConsumerWidget {
       BackupJobStatus.running => 'Running',
       BackupJobStatus.success => 'Success',
       BackupJobStatus.failed => 'Failed',
+    };
+  }
+
+  String _scheduleLabel(BackupScheduleRule scheduleRule) {
+    return switch (scheduleRule) {
+      BackupScheduleRule.manualOnly => 'Manual',
+      BackupScheduleRule.hourly => 'Hourly',
+      BackupScheduleRule.daily => 'Daily',
     };
   }
 

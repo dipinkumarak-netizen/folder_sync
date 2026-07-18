@@ -69,6 +69,7 @@ File Picker
 - Android Foreground Backup Permission Foundation
 - Android Data Sync Foreground Service Skeleton
 - Dart Backup Runner Foreground Service Handoff
+- Scheduled Backup Jobs
 
 ## Synchronization Module
 
@@ -93,6 +94,7 @@ File Picker
 - In-App Sync Scheduler Foundation
 - Android Background Schedule Foundation
 - Headless Dart Scheduled Runner
+- Scheduled Backup Jobs
 - Hourly Sync Rule Trigger
 - Daily Sync Rule Trigger
 - Home Wi-Fi Sync Rule Trigger Foundation
@@ -194,11 +196,12 @@ Scheduler
 - In-App Sync Scheduler Foundation
 - Android AlarmManager Schedule Registration
 - Headless Dart Scheduled Runner
+- Scheduled Backup Jobs
 - Sync Rule Trigger Evaluation
 
 Pending:
 
-- Scheduled Backup Jobs
+- Backup Wi-Fi Schedule Rules
 
 Milestone 6
 

@@ -7,6 +7,8 @@
 
 enum BackupJobStatus { idle, running, success, failed }
 
+enum BackupScheduleRule { manualOnly, hourly, daily }
+
 class BackupJobModel {
   final String id;
   final String name;
@@ -14,6 +16,7 @@ class BackupJobModel {
   final String ftpServerId;
   final String remoteFolderPath;
   final bool enabled;
+  final BackupScheduleRule scheduleRule;
   final BackupJobStatus status;
   final DateTime? lastRunAt;
   final String lastMessage;
@@ -29,6 +32,7 @@ class BackupJobModel {
     required this.ftpServerId,
     required this.remoteFolderPath,
     this.enabled = true,
+    this.scheduleRule = BackupScheduleRule.manualOnly,
     this.status = BackupJobStatus.idle,
     this.lastRunAt,
     this.lastMessage = 'Not run yet',
@@ -45,6 +49,7 @@ class BackupJobModel {
     String? ftpServerId,
     String? remoteFolderPath,
     bool? enabled,
+    BackupScheduleRule? scheduleRule,
     BackupJobStatus? status,
     DateTime? lastRunAt,
     String? lastMessage,
@@ -60,6 +65,7 @@ class BackupJobModel {
       ftpServerId: ftpServerId ?? this.ftpServerId,
       remoteFolderPath: remoteFolderPath ?? this.remoteFolderPath,
       enabled: enabled ?? this.enabled,
+      scheduleRule: scheduleRule ?? this.scheduleRule,
       status: status ?? this.status,
       lastRunAt: lastRunAt ?? this.lastRunAt,
       lastMessage: lastMessage ?? this.lastMessage,
@@ -80,6 +86,7 @@ class BackupJobModel {
       'ftpServerId': ftpServerId,
       'remoteFolderPath': remoteFolderPath,
       'enabled': enabled,
+      'scheduleRule': scheduleRule.name,
       'status': status.name,
       'lastRunAt': lastRunAt?.toIso8601String(),
       'lastMessage': lastMessage,
@@ -104,6 +111,11 @@ class BackupJobModel {
       ftpServerId: json['ftpServerId'] as String? ?? '',
       remoteFolderPath: json['remoteFolderPath'] as String? ?? '/',
       enabled: json['enabled'] as bool? ?? true,
+      scheduleRule: _enumValue(
+        BackupScheduleRule.values,
+        json['scheduleRule'],
+        BackupScheduleRule.manualOnly,
+      ),
       status: status == BackupJobStatus.running ? BackupJobStatus.idle : status,
       lastRunAt: lastRunAtValue == null
           ? null
@@ -116,6 +128,17 @@ class BackupJobModel {
           (json['backedUpRelativePaths'] as List<dynamic>? ?? const [])
               .whereType<String>()
               .toList(),
+    );
+  }
+
+  static T _enumValue<T extends Enum>(
+    List<T> values,
+    Object? name,
+    T fallback,
+  ) {
+    return values.firstWhere(
+      (value) => value.name == name,
+      orElse: () => fallback,
     );
   }
 }

@@ -107,6 +107,10 @@ class BackupMemoryRepository {
     }
   }
 
+  Future<void> flush() {
+    return _save();
+  }
+
   Future<BackupRunResult> runBackup({
     required BackupJobModel job,
     required FtpServerModel ftpServer,
