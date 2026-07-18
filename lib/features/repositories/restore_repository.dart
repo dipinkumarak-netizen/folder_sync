@@ -24,6 +24,22 @@ class RestoreFileEntry {
   });
 }
 
+class RestoreFilterOptions {
+  final bool includeSubfolders;
+  final bool includeHiddenFiles;
+  final String includePatterns;
+  final String excludePatterns;
+  final int? maxFileSizeMb;
+
+  const RestoreFilterOptions({
+    this.includeSubfolders = true,
+    this.includeHiddenFiles = false,
+    this.includePatterns = '*',
+    this.excludePatterns = '',
+    this.maxFileSizeMb,
+  });
+}
+
 class RestorePreviewResult {
   final bool success;
   final String message;
@@ -98,6 +114,7 @@ class RestoreRepository {
   Future<RestorePreviewResult> previewFiles({
     required FtpServerModel ftpServer,
     required String remoteFolderPath,
+    required RestoreFilterOptions filterOptions,
   }) async {
     final ftpConnect = _connectFor(ftpServer);
     var connected = false;
@@ -116,6 +133,7 @@ class RestoreRepository {
       final files = await _collectRemoteFiles(
         ftpConnect: ftpConnect,
         remoteRoot: remoteRoot,
+        filterOptions: filterOptions,
       );
 
       return RestorePreviewResult(
@@ -144,6 +162,7 @@ class RestoreRepository {
     required String remoteFolderPath,
     required String localFolderPath,
     required RestoreConflictRule conflictRule,
+    required RestoreFilterOptions filterOptions,
   }) async {
     final localDirectory = Directory(localFolderPath);
     if (!await localDirectory.exists()) {
@@ -179,6 +198,7 @@ class RestoreRepository {
       final files = await _collectRemoteFiles(
         ftpConnect: ftpConnect,
         remoteRoot: remoteRoot,
+        filterOptions: filterOptions,
       );
 
       var filesRestored = 0;
@@ -312,6 +332,7 @@ class RestoreRepository {
   Future<List<RestoreFileEntry>> _collectRemoteFiles({
     required FTPConnect ftpConnect,
     required String remoteRoot,
+    required RestoreFilterOptions filterOptions,
   }) async {
     final files = <RestoreFileEntry>[];
     await _changeRemoteDirectory(ftpConnect, remoteRoot);
@@ -319,6 +340,7 @@ class RestoreRepository {
       ftpConnect: ftpConnect,
       remoteRoot: remoteRoot,
       relativeDirectory: '.',
+      filterOptions: filterOptions,
       files: files,
     );
     files.sort(
@@ -331,6 +353,7 @@ class RestoreRepository {
     required FTPConnect ftpConnect,
     required String remoteRoot,
     required String relativeDirectory,
+    required RestoreFilterOptions filterOptions,
     required List<RestoreFileEntry> files,
   }) async {
     await _changeRemoteDirectory(ftpConnect, remoteRoot);
@@ -344,17 +367,27 @@ class RestoreRepository {
           ? entry.name
           : path.posix.join(relativeDirectory, entry.name);
       final safeRelativePath = _safeRelativePath(relativePath);
-      if (entry.type == FTPEntryType.dir) {
+      if (entry.type == FTPEntryType.dir && filterOptions.includeSubfolders) {
         await _collectRemoteFilesInDirectory(
           ftpConnect: ftpConnect,
           remoteRoot: remoteRoot,
           relativeDirectory: safeRelativePath,
+          filterOptions: filterOptions,
           files: files,
         );
         continue;
       }
 
       if (entry.type != FTPEntryType.file) {
+        continue;
+      }
+
+      if (!_matchesFilter(
+        relativePath: safeRelativePath,
+        name: entry.name,
+        size: entry.size ?? 0,
+        filterOptions: filterOptions,
+      )) {
         continue;
       }
 
@@ -472,6 +505,45 @@ class RestoreRepository {
     }
 
     return normalized;
+  }
+
+  bool _matchesFilter({
+    required String relativePath,
+    required String name,
+    required int size,
+    required RestoreFilterOptions filterOptions,
+  }) {
+    if (!filterOptions.includeHiddenFiles && name.startsWith('.')) {
+      return false;
+    }
+
+    final maxFileSizeMb = filterOptions.maxFileSizeMb;
+    if (maxFileSizeMb != null && size > maxFileSizeMb * 1024 * 1024) {
+      return false;
+    }
+
+    final includePatterns = _patterns(filterOptions.includePatterns);
+    final excludePatterns = _patterns(filterOptions.excludePatterns);
+    final included =
+        includePatterns.isEmpty ||
+        includePatterns.any((pattern) => _globMatch(pattern, relativePath));
+    final excluded = excludePatterns.any(
+      (pattern) => _globMatch(pattern, relativePath),
+    );
+    return included && !excluded;
+  }
+
+  List<String> _patterns(String value) {
+    return value
+        .split(',')
+        .map((pattern) => pattern.trim())
+        .where((pattern) => pattern.isNotEmpty && pattern != '*')
+        .toList();
+  }
+
+  bool _globMatch(String pattern, String value) {
+    final escaped = RegExp.escape(pattern).replaceAll(r'\*', '.*');
+    return RegExp('^$escaped\$').hasMatch(value);
   }
 
   String _normalizeRemotePath(String remotePath) {

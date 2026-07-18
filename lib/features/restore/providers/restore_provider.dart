@@ -82,6 +82,7 @@ class RestoreNotifier extends StateNotifier<RestoreState> {
     required String remoteFolderPath,
     required String localFolderPath,
     required RestoreConflictRule conflictRule,
+    required RestoreFilterOptions filterOptions,
   }) async {
     state = state.copyWith(
       status: RestoreStatus.previewing,
@@ -93,6 +94,7 @@ class RestoreNotifier extends StateNotifier<RestoreState> {
     final result = await _repository.previewFiles(
       ftpServer: ftpServer,
       remoteFolderPath: remoteFolderPath,
+      filterOptions: filterOptions,
     );
     final conflictPreview = result.success
         ? await _repository.previewLocalConflicts(
@@ -140,11 +142,21 @@ class RestoreNotifier extends StateNotifier<RestoreState> {
     );
   }
 
+  void clearPreview(String message) {
+    state = state.copyWith(
+      status: RestoreStatus.idle,
+      message: message,
+      previewFiles: const [],
+      conflictPreview: const RestoreConflictPreviewResult.empty(),
+    );
+  }
+
   Future<RestoreRunResult> runRestore({
     required FtpServerModel ftpServer,
     required String remoteFolderPath,
     required String localFolderPath,
     required RestoreConflictRule conflictRule,
+    required RestoreFilterOptions filterOptions,
   }) async {
     state = state.copyWith(
       status: RestoreStatus.running,
@@ -163,6 +175,7 @@ class RestoreNotifier extends StateNotifier<RestoreState> {
         remoteFolderPath: remoteFolderPath,
         localFolderPath: localFolderPath,
         conflictRule: conflictRule,
+        filterOptions: filterOptions,
       );
     } catch (_) {
       result = const RestoreRunResult(

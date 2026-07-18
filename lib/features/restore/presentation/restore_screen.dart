@@ -32,14 +32,22 @@ class _RestoreScreenState extends ConsumerState<RestoreScreen> {
   final _formKey = GlobalKey<FormState>();
   final _remoteFolderController = TextEditingController(text: '/');
   final _localFolderController = TextEditingController();
+  final _includePatternsController = TextEditingController(text: '*');
+  final _excludePatternsController = TextEditingController();
+  final _maxFileSizeController = TextEditingController();
 
   String? _selectedFtpServerId;
+  bool _includeSubfolders = true;
+  bool _includeHiddenFiles = false;
   RestoreConflictRule _conflictRule = RestoreConflictRule.skipExisting;
 
   @override
   void dispose() {
     _remoteFolderController.dispose();
     _localFolderController.dispose();
+    _includePatternsController.dispose();
+    _excludePatternsController.dispose();
+    _maxFileSizeController.dispose();
     super.dispose();
   }
 
@@ -85,6 +93,7 @@ class _RestoreScreenState extends ConsumerState<RestoreScreen> {
           remoteFolderPath: _remoteFolderController.text.trim(),
           localFolderPath: _localFolderController.text.trim(),
           conflictRule: _conflictRule,
+          filterOptions: _filterOptions(),
         );
 
     if (!mounted) {
@@ -137,6 +146,7 @@ class _RestoreScreenState extends ConsumerState<RestoreScreen> {
           remoteFolderPath: _remoteFolderController.text.trim(),
           localFolderPath: _localFolderController.text.trim(),
           conflictRule: _conflictRule,
+          filterOptions: _filterOptions(),
         );
 
     if (!mounted) {
@@ -187,7 +197,12 @@ class _RestoreScreenState extends ConsumerState<RestoreScreen> {
                 selectedFtpServerId: _selectedFtpServerId,
                 remoteFolderController: _remoteFolderController,
                 localFolderController: _localFolderController,
+                includePatternsController: _includePatternsController,
+                excludePatternsController: _excludePatternsController,
+                maxFileSizeController: _maxFileSizeController,
                 conflictRule: _conflictRule,
+                includeSubfolders: _includeSubfolders,
+                includeHiddenFiles: _includeHiddenFiles,
                 inputDecoration: _inputDecoration,
                 onFtpChanged: isBusy
                     ? null
@@ -195,8 +210,29 @@ class _RestoreScreenState extends ConsumerState<RestoreScreen> {
                         setState(() {
                           _selectedFtpServerId = value;
                         });
+                        _clearPreviewAfterInputChange();
                       },
                 onPickDestination: isBusy ? null : _pickDestinationFolder,
+                onRemoteFolderChanged: isBusy
+                    ? null
+                    : (_) => _clearPreviewAfterInputChange(),
+                onIncludeSubfoldersChanged: isBusy
+                    ? null
+                    : (value) {
+                        setState(() {
+                          _includeSubfolders = value;
+                        });
+                        _clearPreviewAfterInputChange();
+                      },
+                onIncludeHiddenFilesChanged: isBusy
+                    ? null
+                    : (value) {
+                        setState(() {
+                          _includeHiddenFiles = value;
+                        });
+                        _clearPreviewAfterInputChange();
+                      },
+                onFiltersChanged: isBusy ? null : _clearPreviewAfterInputChange,
                 onConflictChanged: isBusy
                     ? null
                     : (value) {
@@ -270,6 +306,27 @@ class _RestoreScreenState extends ConsumerState<RestoreScreen> {
           ),
     );
   }
+
+  void _clearPreviewAfterInputChange() {
+    ref
+        .read(restoreProvider.notifier)
+        .clearPreview('Restore options changed. Preview files again.');
+  }
+
+  RestoreFilterOptions _filterOptions() {
+    final maxFileSizeText = _maxFileSizeController.text.trim();
+    return RestoreFilterOptions(
+      includeSubfolders: _includeSubfolders,
+      includeHiddenFiles: _includeHiddenFiles,
+      includePatterns: _includePatternsController.text.trim().isEmpty
+          ? '*'
+          : _includePatternsController.text.trim(),
+      excludePatterns: _excludePatternsController.text.trim(),
+      maxFileSizeMb: maxFileSizeText.isEmpty
+          ? null
+          : int.parse(maxFileSizeText),
+    );
+  }
 }
 
 class _RestoreOverview extends StatelessWidget {
@@ -326,10 +383,19 @@ class _RestoreFormCard extends StatelessWidget {
     required this.selectedFtpServerId,
     required this.remoteFolderController,
     required this.localFolderController,
+    required this.includePatternsController,
+    required this.excludePatternsController,
+    required this.maxFileSizeController,
     required this.conflictRule,
+    required this.includeSubfolders,
+    required this.includeHiddenFiles,
     required this.inputDecoration,
     required this.onFtpChanged,
     required this.onPickDestination,
+    required this.onRemoteFolderChanged,
+    required this.onIncludeSubfoldersChanged,
+    required this.onIncludeHiddenFilesChanged,
+    required this.onFiltersChanged,
     required this.onConflictChanged,
   });
 
@@ -337,10 +403,19 @@ class _RestoreFormCard extends StatelessWidget {
   final String? selectedFtpServerId;
   final TextEditingController remoteFolderController;
   final TextEditingController localFolderController;
+  final TextEditingController includePatternsController;
+  final TextEditingController excludePatternsController;
+  final TextEditingController maxFileSizeController;
   final RestoreConflictRule conflictRule;
+  final bool includeSubfolders;
+  final bool includeHiddenFiles;
   final InputDecoration Function(String label, IconData icon) inputDecoration;
   final ValueChanged<String?>? onFtpChanged;
   final VoidCallback? onPickDestination;
+  final ValueChanged<String>? onRemoteFolderChanged;
+  final ValueChanged<bool>? onIncludeSubfoldersChanged;
+  final ValueChanged<bool>? onIncludeHiddenFilesChanged;
+  final VoidCallback? onFiltersChanged;
   final ValueChanged<RestoreConflictRule?>? onConflictChanged;
 
   @override
@@ -364,6 +439,7 @@ class _RestoreFormCard extends StatelessWidget {
           const SizedBox(height: AppSizes.paddingM),
           TextFormField(
             controller: remoteFolderController,
+            onChanged: onRemoteFolderChanged,
             decoration: inputDecoration(
               'Remote Backup Folder',
               AppIcons.folder,
@@ -397,6 +473,51 @@ class _RestoreFormCard extends StatelessWidget {
               );
             }).toList(),
             onChanged: onConflictChanged,
+          ),
+          const SizedBox(height: AppSizes.paddingM),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: includeSubfolders,
+            title: const Text('Restore Subfolders'),
+            onChanged: onIncludeSubfoldersChanged,
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: includeHiddenFiles,
+            title: const Text('Include Hidden Files'),
+            onChanged: onIncludeHiddenFilesChanged,
+          ),
+          const SizedBox(height: AppSizes.paddingM),
+          TextFormField(
+            controller: includePatternsController,
+            decoration: inputDecoration('Include Patterns', AppIcons.files),
+            onChanged: (_) => onFiltersChanged?.call(),
+          ),
+          const SizedBox(height: AppSizes.paddingM),
+          TextFormField(
+            controller: excludePatternsController,
+            decoration: inputDecoration('Exclude Patterns', AppIcons.files),
+            onChanged: (_) => onFiltersChanged?.call(),
+          ),
+          const SizedBox(height: AppSizes.paddingM),
+          TextFormField(
+            controller: maxFileSizeController,
+            keyboardType: TextInputType.number,
+            decoration: inputDecoration('Max File Size MB', AppIcons.storage),
+            onChanged: (_) => onFiltersChanged?.call(),
+            validator: (value) {
+              final text = value?.trim() ?? '';
+              if (text.isEmpty) {
+                return null;
+              }
+
+              final size = int.tryParse(text);
+              if (size == null || size < 1) {
+                return 'Enter a valid size';
+              }
+
+              return null;
+            },
           ),
         ],
       ),
