@@ -21,7 +21,9 @@ class BackupForegroundService : Service() {
             return START_NOT_STICKY
         }
 
-        val notification = buildNotification()
+        val title = intent?.getStringExtra(EXTRA_TITLE) ?: "OpenBackup"
+        val message = intent?.getStringExtra(EXTRA_MESSAGE) ?: "Backup is running"
+        val notification = buildNotification(title, message)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
                 NOTIFICATION_ID,
@@ -54,7 +56,7 @@ class BackupForegroundService : Service() {
         notificationManager.createNotificationChannel(channel)
     }
 
-    private fun buildNotification(): Notification {
+    private fun buildNotification(title: String, message: String): Notification {
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, CHANNEL_ID)
         } else {
@@ -64,8 +66,8 @@ class BackupForegroundService : Service() {
 
         return builder
             .setSmallIcon(applicationInfo.icon)
-            .setContentTitle("OpenBackup")
-            .setContentText("Backup is running")
+            .setContentTitle(title)
+            .setContentText(message)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .build()
@@ -73,6 +75,8 @@ class BackupForegroundService : Service() {
 
     companion object {
         const val ACTION_STOP = "com.example.folder_sync.action.STOP_BACKUP"
+        const val EXTRA_TITLE = "com.example.folder_sync.extra.TITLE"
+        const val EXTRA_MESSAGE = "com.example.folder_sync.extra.MESSAGE"
         private const val CHANNEL_ID = "backup_progress"
         private const val NOTIFICATION_ID = 1001
     }

@@ -2,25 +2,22 @@ import 'package:flutter/services.dart';
 
 /// ===============================================================
 /// OpenBackup
-/// File : backup_foreground_service.dart
+/// File : sync_foreground_service.dart
 /// Version : 1.0.0
-/// Description : Flutter bridge for the native data-sync foreground service.
+/// Description : Flutter bridge for native sync foreground progress.
 /// ===============================================================
 
-class BackupForegroundServiceBridge {
-  BackupForegroundServiceBridge._();
+class SyncForegroundServiceBridge {
+  SyncForegroundServiceBridge._();
 
   static const MethodChannel _channel = MethodChannel(
     'openbackup/backup_foreground_service',
   );
 
-  static Future<bool> start({
-    String title = 'OpenBackup',
-    String message = 'Backup is running',
-  }) async {
+  static Future<bool> start({required String message}) async {
     try {
       final started = await _channel.invokeMethod<bool>('start', {
-        'title': title,
+        'title': 'OpenBackup Sync',
         'message': message,
       });
       return started ?? false;

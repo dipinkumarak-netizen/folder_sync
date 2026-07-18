@@ -17,7 +17,9 @@ class MainActivity : FlutterActivity() {
         ).setMethodCallHandler { call, result ->
             when (call.method) {
                 "start" -> {
-                    result.success(startBackupForegroundService())
+                    val title = call.argument<String>("title") ?: "OpenBackup"
+                    val message = call.argument<String>("message") ?: "Backup is running"
+                    result.success(startBackupForegroundService(title, message))
                 }
 
                 "stop" -> {
@@ -40,9 +42,12 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun startBackupForegroundService(): Boolean {
+    private fun startBackupForegroundService(title: String, message: String): Boolean {
         return try {
-            val intent = Intent(this, BackupForegroundService::class.java)
+            val intent = Intent(this, BackupForegroundService::class.java).apply {
+                putExtra(BackupForegroundService.EXTRA_TITLE, title)
+                putExtra(BackupForegroundService.EXTRA_MESSAGE, message)
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 startForegroundService(intent)
             } else {

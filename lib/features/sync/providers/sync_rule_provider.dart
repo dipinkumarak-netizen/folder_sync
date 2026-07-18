@@ -7,6 +7,7 @@ import '../../history/models/history_entry_model.dart';
 import '../../history/providers/history_provider.dart';
 import '../../repositories/sync_rule_repository.dart';
 import '../models/sync_rule_model.dart';
+import '../services/sync_foreground_service.dart';
 import '../services/wifi_status_service.dart';
 
 /// ===============================================================
@@ -90,6 +91,10 @@ class SyncRuleNotifier extends StateNotifier<List<SyncRuleModel>> {
     _repository.update(runningRule);
     refresh();
 
+    await SyncForegroundServiceBridge.start(
+      message: 'Synchronization is running',
+    );
+
     SyncRunResult result;
     try {
       result = await _repository.runSync(
@@ -103,6 +108,8 @@ class SyncRuleNotifier extends StateNotifier<List<SyncRuleModel>> {
         filesChanged: 0,
         bytesChanged: 0,
       );
+    } finally {
+      await SyncForegroundServiceBridge.stop();
     }
 
     final completedRule = _completeRule(runningRule, result);
@@ -158,6 +165,10 @@ class SyncRuleNotifier extends StateNotifier<List<SyncRuleModel>> {
     _repository.update(runningRule);
     refresh();
 
+    await SyncForegroundServiceBridge.start(
+      message: 'Protected deletes are running',
+    );
+
     SyncRunResult result;
     try {
       result = await _repository.executeProtectedDeletes(
@@ -171,6 +182,8 @@ class SyncRuleNotifier extends StateNotifier<List<SyncRuleModel>> {
         filesChanged: 0,
         bytesChanged: 0,
       );
+    } finally {
+      await SyncForegroundServiceBridge.stop();
     }
 
     final completedRule = _completeRule(runningRule, result);

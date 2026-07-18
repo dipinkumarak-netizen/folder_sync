@@ -86,6 +86,7 @@ File Picker
 - Home Wi-Fi Name Check Foundation
 - Protected Delete Preview Screen
 - Confirmed Delete Rule Execution
+- Foreground Sync Progress
 
 ## History Module
 
@@ -176,7 +177,6 @@ Synchronization
 Pending:
 
 - Remote File Diffing
-- Foreground Sync Progress
 
 Milestone 5
 
