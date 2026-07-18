@@ -48,6 +48,7 @@ File Picker
 - Navigation
 - Dashboard
 - Dashboard Readiness Status
+- Dashboard Wi-Fi SSID Status
 - Splash Screen
 
 ## FTP Module

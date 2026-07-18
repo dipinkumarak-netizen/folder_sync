@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../backup/providers/backup_provider.dart';
 import '../../ftp/providers/ftp_provider.dart';
+import '../../sync/services/wifi_status_service.dart';
 
 /// ===============================================================
 /// OpenBackup
@@ -19,6 +20,7 @@ class SystemStatusSnapshot {
   final int configuredFtpServers;
   final int configuredBackupJobs;
   final List<ConnectivityResult> connectivity;
+  final String? wifiSsid;
   final int? batteryLevel;
   final BatteryState? batteryState;
   final int? availableStorageBytes;
@@ -27,6 +29,7 @@ class SystemStatusSnapshot {
     required this.configuredFtpServers,
     required this.configuredBackupJobs,
     required this.connectivity,
+    required this.wifiSsid,
     required this.batteryLevel,
     required this.batteryState,
     required this.availableStorageBytes,
@@ -44,6 +47,9 @@ final systemStatusProvider = FutureProvider<SystemStatusSnapshot>((ref) async {
   final ftpServers = ref.watch(ftpServerProvider);
   final backupJobs = ref.watch(backupJobProvider);
   final connectivity = await Connectivity().checkConnectivity();
+  final wifiSsid = connectivity.contains(ConnectivityResult.wifi)
+      ? await WifiStatusService.currentSsid()
+      : null;
 
   int? batteryLevel;
   BatteryState? batteryState;
@@ -68,6 +74,7 @@ final systemStatusProvider = FutureProvider<SystemStatusSnapshot>((ref) async {
     configuredFtpServers: ftpServers.length,
     configuredBackupJobs: backupJobs.length,
     connectivity: connectivity,
+    wifiSsid: wifiSsid,
     batteryLevel: batteryLevel,
     batteryState: batteryState,
     availableStorageBytes: availableStorageBytes,

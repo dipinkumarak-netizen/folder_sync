@@ -116,7 +116,10 @@ class SystemStatusCard extends ConsumerWidget {
                       ? AppColors.success
                       : AppColors.error,
                   title: 'Network',
-                  value: _networkLabel(snapshot.connectivity),
+                  value: _networkLabel(
+                    snapshot.connectivity,
+                    snapshot.wifiSsid,
+                  ),
                 ),
                 _StatusItemData(
                   icon: AppIcons.storage,
@@ -163,10 +166,13 @@ class SystemStatusCard extends ConsumerWidget {
     return AppIcons.network;
   }
 
-  static String _networkLabel(List<ConnectivityResult> connectivity) {
+  static String _networkLabel(
+    List<ConnectivityResult> connectivity,
+    String? wifiSsid,
+  ) {
     if (connectivity.any((result) => result != ConnectivityResult.none)) {
       if (connectivity.contains(ConnectivityResult.wifi)) {
-        return 'Wi-Fi';
+        return wifiSsid ?? 'Wi-Fi';
       }
 
       if (connectivity.contains(ConnectivityResult.mobile)) {
