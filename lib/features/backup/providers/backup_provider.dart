@@ -68,11 +68,19 @@ class BackupJobNotifier extends StateNotifier<List<BackupJobModel>> {
 
     await BackupForegroundServiceBridge.start();
 
-    final BackupRunResult result;
+    BackupRunResult result;
     try {
       result = await _repository.runBackup(
         job: runningJob,
         ftpServer: ftpServer,
+      );
+    } catch (_) {
+      result = BackupRunResult(
+        success: false,
+        message: 'Backup failed unexpectedly.',
+        filesBackedUp: 0,
+        bytesBackedUp: 0,
+        backedUpRelativePaths: runningJob.backedUpRelativePaths,
       );
     } finally {
       await BackupForegroundServiceBridge.stop();
