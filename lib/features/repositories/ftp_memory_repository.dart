@@ -1,5 +1,7 @@
 import 'dart:collection';
 
+import 'package:ftpconnect/ftpconnect.dart';
+
 import '../ftp/models/ftp_server_model.dart';
 
 /// ===============================================================
@@ -69,5 +71,37 @@ class FtpMemoryRepository {
   /// Returns true if repository has no servers.
   bool isEmpty() {
     return _servers.isEmpty;
+  }
+
+  /// Tests whether the FTP server can be reached and authenticated.
+  Future<bool> testConnection(FtpServerModel server) async {
+    final ftpConnect = FTPConnect(
+      server.host,
+      port: server.port,
+      user: server.isAnonymous ? 'anonymous' : server.username,
+      pass: server.isAnonymous ? '' : server.password,
+      timeout: 10,
+    );
+
+    var connected = false;
+    try {
+      connected = await ftpConnect.connect();
+      if (!connected) {
+        return false;
+      }
+
+      final remotePath = server.remotePath.trim();
+      if (remotePath.isEmpty || remotePath == '/') {
+        return true;
+      }
+
+      return ftpConnect.changeDirectory(remotePath);
+    } catch (_) {
+      return false;
+    } finally {
+      if (connected) {
+        await ftpConnect.disconnect();
+      }
+    }
   }
 }

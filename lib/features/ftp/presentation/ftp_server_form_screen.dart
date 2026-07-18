@@ -36,6 +36,7 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
 
   bool _anonymousLogin = false;
   bool _showPassword = false;
+  bool _isTestingConnection = false;
 
   bool get _isEditing => widget.server != null;
 
@@ -80,13 +81,9 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
     );
   }
 
-  void _saveServer() {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
+  FtpServerModel _buildServerFromForm() {
     final remotePath = _remotePathController.text.trim();
-    final server = FtpServerModel(
+    return FtpServerModel(
       id: widget.server?.id ?? const Uuid().v4(),
       name: _nameController.text.trim(),
       host: _hostController.text.trim(),
@@ -97,7 +94,14 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
       isAnonymous: _anonymousLogin,
       isFavorite: widget.server?.isFavorite ?? false,
     );
+  }
 
+  void _saveServer() {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    final server = _buildServerFromForm();
     final notifier = ref.read(ftpServerProvider.notifier);
     if (_isEditing) {
       notifier.updateServer(server);
@@ -106,6 +110,40 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
     }
 
     Navigator.pop(context);
+  }
+
+  Future<void> _testConnection() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() {
+      _isTestingConnection = true;
+    });
+
+    final server = _buildServerFromForm();
+    final success = await ref
+        .read(ftpServerProvider.notifier)
+        .testConnection(server);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isTestingConnection = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          success
+              ? "FTP connection successful."
+              : "Could not connect to the FTP server.",
+        ),
+        backgroundColor: success ? AppColors.success : AppColors.error,
+      ),
+    );
   }
 
   @override
@@ -204,8 +242,23 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
                 },
               ),
               const SizedBox(height: AppSizes.paddingXL),
+              OutlinedButton.icon(
+                onPressed: _isTestingConnection ? null : _testConnection,
+                icon: _isTestingConnection
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.wifi_tethering_rounded),
+                label: Text(
+                  _isTestingConnection
+                      ? "Testing Connection"
+                      : "Test Connection",
+                ),
+              ),
+              const SizedBox(height: AppSizes.paddingM),
               FilledButton.icon(
-                onPressed: _saveServer,
+                onPressed: _isTestingConnection ? null : _saveServer,
                 icon: const Icon(Icons.save),
                 label: Text(
                   _isEditing ? "Update FTP Server" : "Save FTP Server",

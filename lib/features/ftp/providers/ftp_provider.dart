@@ -44,10 +44,14 @@ class FtpServerNotifier extends StateNotifier<List<FtpServerModel>> {
     _repository.clear();
     refresh();
   }
+
+  Future<bool> testConnection(FtpServerModel server) {
+    return _repository.testConnection(server);
+  }
 }
 
 final ftpServerProvider =
     StateNotifierProvider<FtpServerNotifier, List<FtpServerModel>>((ref) {
-  final repository = ref.watch(ftpRepositoryProvider);
-  return FtpServerNotifier(repository);
-});
+      final repository = ref.watch(ftpRepositoryProvider);
+      return FtpServerNotifier(repository);
+    });
