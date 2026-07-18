@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_icons.dart';
@@ -9,6 +10,7 @@ import '../../ftp/models/ftp_server_model.dart';
 import '../../ftp/presentation/ftp_server_list_screen.dart';
 import '../../ftp/providers/ftp_provider.dart';
 import '../models/backup_job_model.dart';
+import '../providers/backup_permission_provider.dart';
 import '../providers/backup_provider.dart';
 import 'backup_job_form_screen.dart';
 
@@ -45,14 +47,25 @@ class BackupJobListScreen extends ConsumerWidget {
         child: const Icon(AppIcons.add),
       ),
       body: jobs.isEmpty
-          ? _EmptyBackupJobs(hasFtpServers: ftpServers.isNotEmpty)
+          ? ListView(
+              padding: const EdgeInsets.all(AppSizes.paddingM),
+              children: [
+                const _ForegroundReadinessCard(),
+                const SizedBox(height: AppSizes.paddingM),
+                _EmptyBackupJobs(hasFtpServers: ftpServers.isNotEmpty),
+              ],
+            )
           : ListView.separated(
               padding: const EdgeInsets.all(AppSizes.paddingM),
-              itemCount: jobs.length,
+              itemCount: jobs.length + 1,
               separatorBuilder: (_, _) =>
                   const SizedBox(height: AppSizes.paddingM),
               itemBuilder: (context, index) {
-                final job = jobs[index];
+                if (index == 0) {
+                  return const _ForegroundReadinessCard();
+                }
+
+                final job = jobs[index - 1];
                 return _BackupJobTile(
                   job: job,
                   ftpServer: _findServer(ftpServers, job.ftpServerId),
@@ -81,47 +94,148 @@ class _EmptyBackupJobs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(AppSizes.paddingM),
-      children: [
-        OBCard(
-          child: Column(
-            children: [
-              const Icon(AppIcons.backup, size: 60, color: Colors.green),
-              const SizedBox(height: AppSizes.paddingM),
-              Text(
-                'No Backup Jobs',
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: AppSizes.paddingS),
-              Text(
-                hasFtpServers
-                    ? 'Press the + button to back up a local folder to FTP.'
-                    : 'Add an FTP server first, then create a backup job.',
-                textAlign: TextAlign.center,
-                style: Theme.of(
+    return OBCard(
+      child: Column(
+        children: [
+          const Icon(AppIcons.backup, size: 60, color: Colors.green),
+          const SizedBox(height: AppSizes.paddingM),
+          Text(
+            'No Backup Jobs',
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+          const SizedBox(height: AppSizes.paddingS),
+          Text(
+            hasFtpServers
+                ? 'Press the + button to back up a local folder to FTP.'
+                : 'Add an FTP server first, then create a backup job.',
+            textAlign: TextAlign.center,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.textHint),
+          ),
+          if (!hasFtpServers) ...[
+            const SizedBox(height: AppSizes.paddingL),
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.push(
                   context,
-                ).textTheme.bodyMedium?.copyWith(color: AppColors.textHint),
-              ),
-              if (!hasFtpServers) ...[
-                const SizedBox(height: AppSizes.paddingL),
-                OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const FtpServerListScreen(),
-                      ),
-                    );
-                  },
-                  icon: const Icon(AppIcons.server),
-                  label: const Text('Open FTP Servers'),
+                  MaterialPageRoute(
+                    builder: (_) => const FtpServerListScreen(),
+                  ),
+                );
+              },
+              icon: const Icon(AppIcons.server),
+              label: const Text('Open FTP Servers'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ForegroundReadinessCard extends ConsumerWidget {
+  const _ForegroundReadinessCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final permissionState = ref.watch(backupPermissionProvider);
+
+    return permissionState.when(
+      loading: () => const OBCard(
+        child: Row(
+          children: [
+            Icon(AppIcons.info, color: AppColors.info),
+            SizedBox(width: AppSizes.paddingM),
+            Expanded(child: Text('Checking backup permissions...')),
+          ],
+        ),
+      ),
+      error: (_, _) => const _PermissionContent(
+        icon: AppIcons.warning,
+        iconColor: AppColors.warning,
+        title: 'Permission Check Unavailable',
+        message: 'Backup can run now, but notification readiness is unknown.',
+      ),
+      data: (state) {
+        if (state.canShowForegroundProgress) {
+          return const _PermissionContent(
+            icon: AppIcons.success,
+            iconColor: AppColors.success,
+            title: 'Foreground Backup Ready',
+            message: 'Backup progress notifications are enabled.',
+          );
+        }
+
+        return _PermissionContent(
+          icon: AppIcons.warning,
+          iconColor: AppColors.warning,
+          title: 'Enable Backup Notifications',
+          message:
+              'Android requires a visible notification for long-running backup work.',
+          actionLabel: state.notificationPermanentlyDenied
+              ? 'Open Settings'
+              : 'Allow Notifications',
+          onAction: state.notificationPermanentlyDenied
+              ? openAppSettings
+              : () => ref
+                    .read(backupPermissionProvider.notifier)
+                    .requestNotificationPermission(),
+        );
+      },
+    );
+  }
+}
+
+class _PermissionContent extends StatelessWidget {
+  const _PermissionContent({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return OBCard(
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 24,
+            backgroundColor: iconColor.withValues(alpha: 0.15),
+            child: Icon(icon, color: iconColor),
+          ),
+          const SizedBox(width: AppSizes.paddingM),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: AppSizes.paddingXS),
+                Text(
+                  message,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: AppColors.textHint),
                 ),
               ],
-            ],
+            ),
           ),
-        ),
-      ],
+          if (actionLabel != null && onAction != null) ...[
+            const SizedBox(width: AppSizes.paddingS),
+            TextButton(onPressed: onAction, child: Text(actionLabel!)),
+          ],
+        ],
+      ),
     );
   }
 }

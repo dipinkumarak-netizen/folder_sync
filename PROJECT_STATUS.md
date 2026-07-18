@@ -66,6 +66,8 @@ File Picker
 - Manual New-Files-Only FTP Backup
 - Backup Run Status Summary
 - Local Backup Job Persistence
+- Android Foreground Backup Permission Foundation
+- Android Data Sync Foreground Service Skeleton
 
 ---
 
@@ -130,8 +132,9 @@ Working Backup
 
 Pending:
 
-- Background Folder Watching
+- Dart Backup Runner Foreground Service Handoff
 - Scheduled Backup
+- Background Folder Watching
 
 Milestone 4
 
