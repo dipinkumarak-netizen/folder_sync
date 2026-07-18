@@ -8,6 +8,7 @@ import '../../../core/constants/app_icons.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../ftp/models/ftp_server_model.dart';
 import '../../ftp/providers/ftp_provider.dart';
+import '../../settings/providers/app_settings_provider.dart';
 import '../models/sync_rule_model.dart';
 import '../providers/sync_rule_provider.dart';
 
@@ -42,6 +43,7 @@ class _SyncRuleFormScreenState extends ConsumerState<SyncRuleFormScreen> {
   bool _syncSubfolders = true;
   bool _includeHiddenFiles = false;
   bool _runOnWifiOnly = true;
+  bool _appliedSettingsDefaults = false;
   SyncDirection _direction = SyncDirection.twoWay;
   SyncConflictRule _conflictRule = SyncConflictRule.newerWins;
   SyncDeleteRule _deleteRule = SyncDeleteRule.keepDeletedFiles;
@@ -166,8 +168,14 @@ class _SyncRuleFormScreenState extends ConsumerState<SyncRuleFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final settingsLoad = ref.watch(appSettingsLoadProvider);
+    final settings = ref.watch(appSettingsProvider);
     ref.watch(ftpServerLoadProvider);
     final ftpServers = ref.watch(ftpServerProvider);
+    if (!_isEditing && !_appliedSettingsDefaults && settingsLoad.hasValue) {
+      _runOnWifiOnly = settings.defaultSyncWifiOnly;
+      _appliedSettingsDefaults = true;
+    }
     if (_selectedFtpServerId == null && ftpServers.length == 1) {
       _selectedFtpServerId = ftpServers.first.id;
     }

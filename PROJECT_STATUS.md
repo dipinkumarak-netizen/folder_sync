@@ -100,6 +100,16 @@ File Picker
 - Daily Sync Rule Trigger
 - Home Wi-Fi Sync Rule Trigger Foundation
 
+## Settings Module
+
+- Settings Screen
+- Persistent App Settings
+- Automatic Scheduling Toggle
+- Backup and Sync Wi-Fi Defaults
+- Foreground Notification Toggle
+- Permission Shortcuts
+- Clear History Action
+
 ## History Module
 
 - History Entry Model
@@ -223,6 +233,12 @@ Pending:
 Milestone 8
 
 Settings
+
+- Settings Screen
+- Scheduling Settings
+- Network Defaults
+- Permission Shortcuts
+- Local Data Actions
 
 Milestone 9
 

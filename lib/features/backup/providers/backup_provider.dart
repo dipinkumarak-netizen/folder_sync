@@ -6,6 +6,8 @@ import '../../ftp/models/ftp_server_model.dart';
 import '../../history/models/history_entry_model.dart';
 import '../../history/providers/history_provider.dart';
 import '../../repositories/backup_memory_repository.dart';
+import '../../settings/models/app_settings_model.dart';
+import '../../settings/providers/app_settings_provider.dart';
 import '../../sync/services/wifi_status_service.dart';
 import '../models/backup_job_model.dart';
 import '../services/backup_foreground_service.dart';
@@ -22,11 +24,12 @@ final backupRepositoryProvider = Provider<BackupMemoryRepository>((ref) {
 });
 
 class BackupJobNotifier extends StateNotifier<List<BackupJobModel>> {
-  BackupJobNotifier(this._repository, this._historyNotifier)
+  BackupJobNotifier(this._repository, this._historyNotifier, this._readSettings)
     : super(_repository.getAll().toList());
 
   final BackupMemoryRepository _repository;
   final HistoryNotifier _historyNotifier;
+  final AppSettingsModel Function() _readSettings;
 
   void refresh() {
     state = _repository.getAll().toList();
@@ -92,7 +95,10 @@ class BackupJobNotifier extends StateNotifier<List<BackupJobModel>> {
     _repository.update(runningJob);
     refresh();
 
-    await BackupForegroundServiceBridge.start();
+    var foregroundStarted = false;
+    if (_readSettings().showForegroundNotifications) {
+      foregroundStarted = await BackupForegroundServiceBridge.start();
+    }
 
     BackupRunResult result;
     try {
@@ -109,7 +115,9 @@ class BackupJobNotifier extends StateNotifier<List<BackupJobModel>> {
         backedUpRelativePaths: runningJob.backedUpRelativePaths,
       );
     } finally {
-      await BackupForegroundServiceBridge.stop();
+      if (foregroundStarted) {
+        await BackupForegroundServiceBridge.stop();
+      }
     }
 
     final completedJob = _completeJob(runningJob, result);
@@ -244,7 +252,11 @@ final backupJobProvider =
     StateNotifierProvider<BackupJobNotifier, List<BackupJobModel>>((ref) {
       final repository = ref.watch(backupRepositoryProvider);
       final historyNotifier = ref.watch(historyProvider.notifier);
-      return BackupJobNotifier(repository, historyNotifier);
+      return BackupJobNotifier(
+        repository,
+        historyNotifier,
+        () => ref.read(appSettingsProvider),
+      );
     });
 
 final backupJobLoadProvider = FutureProvider<void>((ref) async {

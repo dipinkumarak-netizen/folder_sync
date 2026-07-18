@@ -6,6 +6,8 @@ import '../../ftp/models/ftp_server_model.dart';
 import '../../history/models/history_entry_model.dart';
 import '../../history/providers/history_provider.dart';
 import '../../repositories/sync_rule_repository.dart';
+import '../../settings/models/app_settings_model.dart';
+import '../../settings/providers/app_settings_provider.dart';
 import '../models/sync_rule_model.dart';
 import '../services/sync_foreground_service.dart';
 import '../services/wifi_status_service.dart';
@@ -22,11 +24,12 @@ final syncRuleRepositoryProvider = Provider<SyncRuleRepository>((ref) {
 });
 
 class SyncRuleNotifier extends StateNotifier<List<SyncRuleModel>> {
-  SyncRuleNotifier(this._repository, this._historyNotifier)
+  SyncRuleNotifier(this._repository, this._historyNotifier, this._readSettings)
     : super(_repository.getAll().toList());
 
   final SyncRuleRepository _repository;
   final HistoryNotifier _historyNotifier;
+  final AppSettingsModel Function() _readSettings;
 
   void refresh() {
     state = _repository.getAll().toList();
@@ -91,9 +94,12 @@ class SyncRuleNotifier extends StateNotifier<List<SyncRuleModel>> {
     _repository.update(runningRule);
     refresh();
 
-    await SyncForegroundServiceBridge.start(
-      message: 'Synchronization is running',
-    );
+    var foregroundStarted = false;
+    if (_readSettings().showForegroundNotifications) {
+      foregroundStarted = await SyncForegroundServiceBridge.start(
+        message: 'Synchronization is running',
+      );
+    }
 
     SyncRunResult result;
     try {
@@ -109,7 +115,9 @@ class SyncRuleNotifier extends StateNotifier<List<SyncRuleModel>> {
         bytesChanged: 0,
       );
     } finally {
-      await SyncForegroundServiceBridge.stop();
+      if (foregroundStarted) {
+        await SyncForegroundServiceBridge.stop();
+      }
     }
 
     final completedRule = _completeRule(runningRule, result);
@@ -165,9 +173,12 @@ class SyncRuleNotifier extends StateNotifier<List<SyncRuleModel>> {
     _repository.update(runningRule);
     refresh();
 
-    await SyncForegroundServiceBridge.start(
-      message: 'Protected deletes are running',
-    );
+    var foregroundStarted = false;
+    if (_readSettings().showForegroundNotifications) {
+      foregroundStarted = await SyncForegroundServiceBridge.start(
+        message: 'Protected deletes are running',
+      );
+    }
 
     SyncRunResult result;
     try {
@@ -183,7 +194,9 @@ class SyncRuleNotifier extends StateNotifier<List<SyncRuleModel>> {
         bytesChanged: 0,
       );
     } finally {
-      await SyncForegroundServiceBridge.stop();
+      if (foregroundStarted) {
+        await SyncForegroundServiceBridge.stop();
+      }
     }
 
     final completedRule = _completeRule(runningRule, result);
@@ -308,7 +321,11 @@ final syncRuleProvider =
     StateNotifierProvider<SyncRuleNotifier, List<SyncRuleModel>>((ref) {
       final repository = ref.watch(syncRuleRepositoryProvider);
       final historyNotifier = ref.watch(historyProvider.notifier);
-      return SyncRuleNotifier(repository, historyNotifier);
+      return SyncRuleNotifier(
+        repository,
+        historyNotifier,
+        () => ref.read(appSettingsProvider),
+      );
     });
 
 final syncRuleLoadProvider = FutureProvider<void>((ref) async {

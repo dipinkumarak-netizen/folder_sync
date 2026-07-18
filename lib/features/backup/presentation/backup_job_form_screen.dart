@@ -8,6 +8,7 @@ import '../../../core/constants/app_icons.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../ftp/models/ftp_server_model.dart';
 import '../../ftp/providers/ftp_provider.dart';
+import '../../settings/providers/app_settings_provider.dart';
 import '../models/backup_job_model.dart';
 import '../providers/backup_provider.dart';
 
@@ -38,6 +39,7 @@ class _BackupJobFormScreenState extends ConsumerState<BackupJobFormScreen> {
   String? _selectedFtpServerId;
   bool _enabled = true;
   bool _runOnWifiOnly = true;
+  bool _appliedSettingsDefaults = false;
   BackupScheduleRule _scheduleRule = BackupScheduleRule.manualOnly;
 
   bool get _isEditing => widget.job != null;
@@ -136,8 +138,14 @@ class _BackupJobFormScreenState extends ConsumerState<BackupJobFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final settingsLoad = ref.watch(appSettingsLoadProvider);
+    final settings = ref.watch(appSettingsProvider);
     ref.watch(ftpServerLoadProvider);
     final ftpServers = ref.watch(ftpServerProvider);
+    if (!_isEditing && !_appliedSettingsDefaults && settingsLoad.hasValue) {
+      _runOnWifiOnly = settings.defaultBackupWifiOnly;
+      _appliedSettingsDefaults = true;
+    }
     if (_selectedFtpServerId == null && ftpServers.length == 1) {
       _selectedFtpServerId = ftpServers.first.id;
     }

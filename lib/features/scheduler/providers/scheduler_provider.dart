@@ -6,6 +6,7 @@ import '../../backup/models/backup_job_model.dart';
 import '../../backup/providers/backup_provider.dart';
 import '../../ftp/models/ftp_server_model.dart';
 import '../../ftp/providers/ftp_provider.dart';
+import '../../settings/providers/app_settings_provider.dart';
 import '../../sync/models/sync_rule_model.dart';
 import '../../sync/providers/sync_rule_provider.dart';
 import '../../sync/services/wifi_status_service.dart';
@@ -58,6 +59,10 @@ class SchedulerService {
     try {
       await _loadRepositories();
       await _configureAndroidBackgroundSchedule();
+      final settings = _ref.read(appSettingsProvider);
+      if (!settings.automaticSchedulingEnabled) {
+        return;
+      }
 
       final ftpServers = _ref.read(ftpServerProvider);
       await _runDueBackupJobs(ftpServers);
@@ -65,6 +70,11 @@ class SchedulerService {
     } finally {
       _isTicking = false;
     }
+  }
+
+  Future<void> refreshBackgroundSchedule() async {
+    await _loadRepositories();
+    await _configureAndroidBackgroundSchedule();
   }
 
   void dispose() {
@@ -119,6 +129,7 @@ class SchedulerService {
   }
 
   Future<void> _loadRepositories() async {
+    await _ref.read(appSettingsProvider.notifier).loadSettings();
     await _ref.read(backupJobProvider.notifier).loadJobs();
     await _ref.read(ftpServerProvider.notifier).loadServers();
     await _ref.read(syncRuleProvider.notifier).loadRules();
@@ -163,6 +174,12 @@ class SchedulerService {
   }
 
   Future<void> _configureAndroidBackgroundSchedule() async {
+    final settings = _ref.read(appSettingsProvider);
+    if (!settings.automaticSchedulingEnabled) {
+      await AndroidBackgroundSchedulerService.cancel();
+      return;
+    }
+
     final jobs = _ref.read(backupJobProvider);
     final rules = _ref.read(syncRuleProvider);
     final hasAutomaticWork =
