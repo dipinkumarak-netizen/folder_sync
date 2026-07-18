@@ -68,6 +68,7 @@ File Picker
 - Local Backup Job Persistence
 - Android Foreground Backup Permission Foundation
 - Android Data Sync Foreground Service Skeleton
+- Dart Backup Runner Foreground Service Handoff
 
 ---
 
@@ -132,7 +133,7 @@ Working Backup
 
 Pending:
 
-- Dart Backup Runner Foreground Service Handoff
+- Foreground Backup Progress Notifications
 - Scheduled Backup
 - Background Folder Watching
 

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../ftp/models/ftp_server_model.dart';
 import '../../repositories/backup_memory_repository.dart';
 import '../models/backup_job_model.dart';
+import '../services/backup_foreground_service.dart';
 
 /// ===============================================================
 /// OpenBackup
@@ -65,10 +66,17 @@ class BackupJobNotifier extends StateNotifier<List<BackupJobModel>> {
     _repository.update(runningJob);
     refresh();
 
-    final result = await _repository.runBackup(
-      job: runningJob,
-      ftpServer: ftpServer,
-    );
+    await BackupForegroundServiceBridge.start();
+
+    final BackupRunResult result;
+    try {
+      result = await _repository.runBackup(
+        job: runningJob,
+        ftpServer: ftpServer,
+      );
+    } finally {
+      await BackupForegroundServiceBridge.stop();
+    }
 
     final completedJob = runningJob.copyWith(
       status: result.success ? BackupJobStatus.success : BackupJobStatus.failed,

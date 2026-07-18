@@ -16,6 +16,8 @@ service requirements.
   as a `dataSync` foreground service.
 - The Backup Jobs screen checks notification permission readiness and lets the
   user request the permission or open app settings.
+- The Dart backup runner starts the native foreground service before backup work
+  begins and stops it after success or failure.
 
 ## Permission Strategy
 
@@ -40,10 +42,9 @@ service requirements.
 
 ## Next Implementation Step
 
-Wire the Dart backup runner to the native foreground service lifecycle:
+Add foreground progress updates:
 
-1. Start `BackupForegroundService` before running a manual backup.
-2. Update the foreground notification with progress.
-3. Stop the service when the backup completes or fails.
-4. Add a scheduler only after persistence and foreground service lifecycle are
+1. Send current file/progress updates from Dart to Android.
+2. Update the active foreground notification with progress text.
+3. Add a scheduler only after persistence and foreground service lifecycle are
    stable.
