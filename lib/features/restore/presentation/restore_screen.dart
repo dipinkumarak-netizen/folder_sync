@@ -368,12 +368,51 @@ class _RestoreOverview extends StatelessWidget {
                     context,
                   ).textTheme.bodyMedium?.copyWith(color: AppColors.textHint),
                 ),
+                if (state.status == RestoreStatus.running) ...[
+                  const SizedBox(height: AppSizes.paddingM),
+                  LinearProgressIndicator(value: _progressValue(state)),
+                  const SizedBox(height: AppSizes.paddingS),
+                  Text(
+                    _progressLabel(state),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: AppColors.textHint),
+                  ),
+                  if (state.currentFilePath.isNotEmpty) ...[
+                    const SizedBox(height: AppSizes.paddingXS),
+                    Text(
+                      state.currentFilePath,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ],
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  double? _progressValue(RestoreState state) {
+    if (state.totalFiles == 0) {
+      return null;
+    }
+
+    return state.currentFileIndex / state.totalFiles;
+  }
+
+  String _progressLabel(RestoreState state) {
+    final totalFiles = state.totalFiles;
+    if (totalFiles == 0) {
+      return 'Preparing files...';
+    }
+
+    return '${state.currentFileIndex}/$totalFiles file(s), '
+        '${state.lastFilesRestored} restored, '
+        '${state.lastFilesSkipped} skipped';
   }
 }
 

@@ -99,6 +99,7 @@ File Picker
 - Restore Conflict Rules
 - Restore Local Conflict Preview
 - Restore Filters
+- Restore Progress Details
 - Foreground Restore Progress
 - Restore History Logging
 
@@ -235,6 +236,7 @@ Restore
 - Skip / Overwrite / Keep Both Conflict Rules
 - Local Conflict Count Preview
 - Subfolder / Hidden / Pattern / Size Restore Filters
+- Restore Progress UI and Foreground Updates
 - Restore History Logging
 
 Milestone 7

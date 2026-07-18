@@ -22,6 +22,9 @@ class RestoreState {
   final String message;
   final List<RestoreFileEntry> previewFiles;
   final RestoreConflictPreviewResult conflictPreview;
+  final int currentFileIndex;
+  final int totalFiles;
+  final String currentFilePath;
   final int lastFilesRestored;
   final int lastFilesSkipped;
   final int lastFilesOverwritten;
@@ -33,6 +36,9 @@ class RestoreState {
     this.message = 'Select a backup folder to restore.',
     this.previewFiles = const [],
     this.conflictPreview = const RestoreConflictPreviewResult.empty(),
+    this.currentFileIndex = 0,
+    this.totalFiles = 0,
+    this.currentFilePath = '',
     this.lastFilesRestored = 0,
     this.lastFilesSkipped = 0,
     this.lastFilesOverwritten = 0,
@@ -45,6 +51,9 @@ class RestoreState {
     String? message,
     List<RestoreFileEntry>? previewFiles,
     RestoreConflictPreviewResult? conflictPreview,
+    int? currentFileIndex,
+    int? totalFiles,
+    String? currentFilePath,
     int? lastFilesRestored,
     int? lastFilesSkipped,
     int? lastFilesOverwritten,
@@ -56,6 +65,9 @@ class RestoreState {
       message: message ?? this.message,
       previewFiles: previewFiles ?? this.previewFiles,
       conflictPreview: conflictPreview ?? this.conflictPreview,
+      currentFileIndex: currentFileIndex ?? this.currentFileIndex,
+      totalFiles: totalFiles ?? this.totalFiles,
+      currentFilePath: currentFilePath ?? this.currentFilePath,
       lastFilesRestored: lastFilesRestored ?? this.lastFilesRestored,
       lastFilesSkipped: lastFilesSkipped ?? this.lastFilesSkipped,
       lastFilesOverwritten: lastFilesOverwritten ?? this.lastFilesOverwritten,
@@ -148,6 +160,9 @@ class RestoreNotifier extends StateNotifier<RestoreState> {
       message: message,
       previewFiles: const [],
       conflictPreview: const RestoreConflictPreviewResult.empty(),
+      currentFileIndex: 0,
+      totalFiles: 0,
+      currentFilePath: '',
     );
   }
 
@@ -161,11 +176,16 @@ class RestoreNotifier extends StateNotifier<RestoreState> {
     state = state.copyWith(
       status: RestoreStatus.running,
       message: 'Restore is running...',
+      currentFileIndex: 0,
+      totalFiles: state.conflictPreview.filesToRestore,
+      currentFilePath: '',
     );
 
     var foregroundStarted = false;
     if (_readSettings().showForegroundNotifications) {
-      foregroundStarted = await RestoreForegroundServiceBridge.start();
+      foregroundStarted = await RestoreForegroundServiceBridge.start(
+        message: 'Preparing restore...',
+      );
     }
 
     RestoreRunResult result;
@@ -176,6 +196,25 @@ class RestoreNotifier extends StateNotifier<RestoreState> {
         localFolderPath: localFolderPath,
         conflictRule: conflictRule,
         filterOptions: filterOptions,
+        onProgress: (progress) async {
+          final message =
+              'Processed ${progress.currentFileIndex}/${progress.totalFiles}: ${progress.currentFilePath}';
+          state = state.copyWith(
+            message: message,
+            currentFileIndex: progress.currentFileIndex,
+            totalFiles: progress.totalFiles,
+            currentFilePath: progress.currentFilePath,
+            lastFilesRestored: progress.filesRestored,
+            lastFilesSkipped: progress.filesSkipped,
+            lastFilesOverwritten: progress.filesOverwritten,
+            lastFilesKeptBoth: progress.filesKeptBoth,
+            lastBytesRestored: progress.bytesRestored,
+          );
+
+          if (foregroundStarted) {
+            await RestoreForegroundServiceBridge.update(message: message);
+          }
+        },
       );
     } catch (_) {
       result = const RestoreRunResult(
@@ -196,6 +235,9 @@ class RestoreNotifier extends StateNotifier<RestoreState> {
     state = state.copyWith(
       status: result.success ? RestoreStatus.success : RestoreStatus.failed,
       message: result.message,
+      currentFileIndex: result.filesRestored + result.filesSkipped,
+      totalFiles: result.filesRestored + result.filesSkipped,
+      currentFilePath: '',
       lastFilesRestored: result.filesRestored,
       lastFilesSkipped: result.filesSkipped,
       lastFilesOverwritten: result.filesOverwritten,

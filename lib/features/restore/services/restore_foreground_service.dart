@@ -14,11 +14,11 @@ class RestoreForegroundServiceBridge {
     'openbackup/backup_foreground_service',
   );
 
-  static Future<bool> start() async {
+  static Future<bool> start({String message = 'Restore is running'}) async {
     try {
       final started = await _channel.invokeMethod<bool>('start', {
         'title': 'OpenBackup Restore',
-        'message': 'Restore is running',
+        'message': message,
       });
       return started ?? false;
     } on MissingPluginException {
@@ -26,6 +26,10 @@ class RestoreForegroundServiceBridge {
     } on PlatformException {
       return false;
     }
+  }
+
+  static Future<void> update({required String message}) async {
+    await start(message: message);
   }
 
   static Future<void> stop() async {

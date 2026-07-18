@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:ftpconnect/ftpconnect.dart';
@@ -106,6 +107,39 @@ class RestoreRunResult {
 
 enum _RestoreDownloadAction { restored, skipped, overwritten, keptBoth }
 
+class RestoreProgressUpdate {
+  final int currentFileIndex;
+  final int totalFiles;
+  final String currentFilePath;
+  final int filesRestored;
+  final int filesSkipped;
+  final int filesOverwritten;
+  final int filesKeptBoth;
+  final int bytesRestored;
+
+  const RestoreProgressUpdate({
+    required this.currentFileIndex,
+    required this.totalFiles,
+    required this.currentFilePath,
+    required this.filesRestored,
+    required this.filesSkipped,
+    required this.filesOverwritten,
+    required this.filesKeptBoth,
+    required this.bytesRestored,
+  });
+
+  double get progress {
+    if (totalFiles == 0) {
+      return 0;
+    }
+
+    return currentFileIndex / totalFiles;
+  }
+}
+
+typedef RestoreProgressCallback =
+    FutureOr<void> Function(RestoreProgressUpdate update);
+
 class RestoreRepository {
   RestoreRepository._();
 
@@ -163,6 +197,7 @@ class RestoreRepository {
     required String localFolderPath,
     required RestoreConflictRule conflictRule,
     required RestoreFilterOptions filterOptions,
+    RestoreProgressCallback? onProgress,
   }) async {
     final localDirectory = Directory(localFolderPath);
     if (!await localDirectory.exists()) {
@@ -207,7 +242,8 @@ class RestoreRepository {
       var filesKeptBoth = 0;
       var bytesRestored = 0;
 
-      for (final file in files) {
+      for (var index = 0; index < files.length; index += 1) {
+        final file = files[index];
         final action = await _downloadFile(
           ftpConnect: ftpConnect,
           remoteRoot: remoteRoot,
@@ -230,6 +266,19 @@ class RestoreRepository {
             filesRestored += 1;
             bytesRestored += file.size;
         }
+
+        await onProgress?.call(
+          RestoreProgressUpdate(
+            currentFileIndex: index + 1,
+            totalFiles: files.length,
+            currentFilePath: file.relativePath,
+            filesRestored: filesRestored,
+            filesSkipped: filesSkipped,
+            filesOverwritten: filesOverwritten,
+            filesKeptBoth: filesKeptBoth,
+            bytesRestored: bytesRestored,
+          ),
+        );
       }
 
       final skipNote = filesSkipped == 0 ? '' : ' Skipped $filesSkipped.';
