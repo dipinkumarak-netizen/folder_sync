@@ -113,6 +113,22 @@ class SyncRuleNotifier extends StateNotifier<List<SyncRuleModel>> {
     return result;
   }
 
+  Future<SyncDeletePreviewResult> previewDeletes({
+    required SyncRuleModel rule,
+    required FtpServerModel ftpServer,
+  }) async {
+    final networkCheck = await _checkNetworkPolicy(rule);
+    if (!networkCheck.success) {
+      return SyncDeletePreviewResult(
+        success: false,
+        message: networkCheck.message,
+        items: const [],
+      );
+    }
+
+    return _repository.previewDeletes(rule: rule, ftpServer: ftpServer);
+  }
+
   SyncRuleModel _completeRule(SyncRuleModel rule, SyncRunResult result) {
     return rule.copyWith(
       status: result.success ? SyncRuleStatus.success : SyncRuleStatus.failed,

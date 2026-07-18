@@ -31,6 +31,42 @@ class SyncRunResult {
   });
 }
 
+enum SyncDeleteTarget { local, remote }
+
+class SyncDeletePreviewItem {
+  final String relativePath;
+  final SyncDeleteTarget target;
+  final int size;
+  final DateTime? modifiedAt;
+
+  const SyncDeletePreviewItem({
+    required this.relativePath,
+    required this.target,
+    required this.size,
+    required this.modifiedAt,
+  });
+}
+
+class SyncDeletePreviewResult {
+  final bool success;
+  final String message;
+  final List<SyncDeletePreviewItem> items;
+
+  const SyncDeletePreviewResult({
+    required this.success,
+    required this.message,
+    required this.items,
+  });
+
+  int get localDeleteCount =>
+      items.where((item) => item.target == SyncDeleteTarget.local).length;
+
+  int get remoteDeleteCount =>
+      items.where((item) => item.target == SyncDeleteTarget.remote).length;
+
+  int get totalBytes => items.fold<int>(0, (sum, item) => sum + item.size);
+}
+
 class _SyncFileEntry {
   final String relativePath;
   final int size;
@@ -161,13 +197,14 @@ class SyncRuleRepository {
       }
 
       final remoteRoot = _normalizeRemotePath(rule.remoteFolderPath);
-      await _changeOrCreateRemoteDirectory(ftpConnect, remoteRoot);
+      await _changeRemoteDirectory(ftpConnect, remoteRoot);
 
       final localFiles = await _collectLocalFiles(localDirectory, rule);
       final remoteFiles = await _collectRemoteFiles(
         ftpConnect: ftpConnect,
         remoteRoot: remoteRoot,
         rule: rule,
+        createDirectories: false,
       );
 
       var filesChanged = 0;
@@ -218,6 +255,92 @@ class SyncRuleRepository {
         message: 'Synchronization failed. Check folders and FTP server.',
         filesChanged: 0,
         bytesChanged: 0,
+      );
+    } finally {
+      if (connected) {
+        await ftpConnect.disconnect();
+      }
+    }
+  }
+
+  Future<SyncDeletePreviewResult> previewDeletes({
+    required SyncRuleModel rule,
+    required FtpServerModel ftpServer,
+  }) async {
+    final localDirectory = Directory(rule.localFolderPath);
+    if (!await localDirectory.exists()) {
+      return const SyncDeletePreviewResult(
+        success: false,
+        message: 'Local folder is not available.',
+        items: [],
+      );
+    }
+
+    if (!_needsProtectedDeletePreview(rule)) {
+      return const SyncDeletePreviewResult(
+        success: true,
+        message: 'No destructive delete rule is enabled.',
+        items: [],
+      );
+    }
+
+    final ftpConnect = FTPConnect(
+      ftpServer.host,
+      port: ftpServer.port,
+      user: ftpServer.isAnonymous ? 'anonymous' : ftpServer.username,
+      pass: ftpServer.isAnonymous ? '' : ftpServer.password,
+      timeout: 30,
+    );
+
+    var connected = false;
+    try {
+      connected = await ftpConnect.connect();
+      if (!connected) {
+        return const SyncDeletePreviewResult(
+          success: false,
+          message: 'Could not connect to the FTP server.',
+          items: [],
+        );
+      }
+
+      final remoteRoot = _normalizeRemotePath(rule.remoteFolderPath);
+      await _changeOrCreateRemoteDirectory(ftpConnect, remoteRoot);
+
+      final localFiles = await _collectLocalFiles(localDirectory, rule);
+      final remoteFiles = await _collectRemoteFiles(
+        ftpConnect: ftpConnect,
+        remoteRoot: remoteRoot,
+        rule: rule,
+      );
+
+      final items =
+          _collectDeletePreviewItems(
+            rule: rule,
+            localFiles: localFiles,
+            remoteFiles: remoteFiles,
+          )..sort((first, second) {
+            final targetCompare = first.target.index.compareTo(
+              second.target.index,
+            );
+            if (targetCompare != 0) {
+              return targetCompare;
+            }
+
+            return first.relativePath.compareTo(second.relativePath);
+          });
+
+      return SyncDeletePreviewResult(
+        success: true,
+        message: items.isEmpty
+            ? 'No protected delete changes found.'
+            : 'Preview found ${items.length} file(s) that would be deleted.',
+        items: items,
+      );
+    } catch (_) {
+      return const SyncDeletePreviewResult(
+        success: false,
+        message: 'Delete preview failed. Check folders and FTP server.',
+        items: [],
       );
     } finally {
       if (connected) {
@@ -385,15 +508,21 @@ class SyncRuleRepository {
     required FTPConnect ftpConnect,
     required String remoteRoot,
     required SyncRuleModel rule,
+    bool createDirectories = true,
   }) async {
     final files = <String, _SyncFileEntry>{};
-    await _changeOrCreateRemoteDirectory(ftpConnect, remoteRoot);
+    if (createDirectories) {
+      await _changeOrCreateRemoteDirectory(ftpConnect, remoteRoot);
+    } else {
+      await _changeRemoteDirectory(ftpConnect, remoteRoot);
+    }
     await _collectRemoteFilesInDirectory(
       ftpConnect: ftpConnect,
       remoteRoot: remoteRoot,
       relativeDirectory: '.',
       rule: rule,
       files: files,
+      createDirectories: createDirectories,
     );
     return files;
   }
@@ -404,10 +533,19 @@ class SyncRuleRepository {
     required String relativeDirectory,
     required SyncRuleModel rule,
     required Map<String, _SyncFileEntry> files,
+    required bool createDirectories,
   }) async {
-    await _changeOrCreateRemoteDirectory(ftpConnect, remoteRoot);
+    if (createDirectories) {
+      await _changeOrCreateRemoteDirectory(ftpConnect, remoteRoot);
+    } else {
+      await _changeRemoteDirectory(ftpConnect, remoteRoot);
+    }
     if (relativeDirectory != '.') {
-      await _changeOrCreateRemoteDirectory(ftpConnect, relativeDirectory);
+      if (createDirectories) {
+        await _changeOrCreateRemoteDirectory(ftpConnect, relativeDirectory);
+      } else {
+        await _changeRemoteDirectory(ftpConnect, relativeDirectory);
+      }
     }
 
     final entries = await ftpConnect.listDirectoryContent();
@@ -422,6 +560,7 @@ class SyncRuleRepository {
           relativeDirectory: relativePath,
           rule: rule,
           files: files,
+          createDirectories: createDirectories,
         );
         continue;
       }
@@ -591,6 +730,64 @@ class SyncRuleRepository {
     return deleteRule != SyncDeleteRule.keepDeletedFiles;
   }
 
+  bool _needsProtectedDeletePreview(SyncRuleModel rule) {
+    return _isDestructiveDeleteRule(rule.deleteRule) ||
+        _isMirrorRule(rule.direction);
+  }
+
+  List<SyncDeletePreviewItem> _collectDeletePreviewItems({
+    required SyncRuleModel rule,
+    required Map<String, _SyncFileEntry> localFiles,
+    required Map<String, _SyncFileEntry> remoteFiles,
+  }) {
+    final itemsByKey = <String, SyncDeletePreviewItem>{};
+
+    void addMissingRemoteDeletes() {
+      for (final remoteEntry in remoteFiles.values) {
+        if (localFiles.containsKey(remoteEntry.relativePath)) {
+          continue;
+        }
+
+        itemsByKey['remote:${remoteEntry.relativePath}'] =
+            SyncDeletePreviewItem(
+              relativePath: remoteEntry.relativePath,
+              target: SyncDeleteTarget.remote,
+              size: remoteEntry.size,
+              modifiedAt: remoteEntry.modifiedAt,
+            );
+      }
+    }
+
+    void addMissingLocalDeletes() {
+      for (final localEntry in localFiles.values) {
+        if (remoteFiles.containsKey(localEntry.relativePath)) {
+          continue;
+        }
+
+        itemsByKey['local:${localEntry.relativePath}'] = SyncDeletePreviewItem(
+          relativePath: localEntry.relativePath,
+          target: SyncDeleteTarget.local,
+          size: localEntry.size,
+          modifiedAt: localEntry.modifiedAt,
+        );
+      }
+    }
+
+    if (rule.direction == SyncDirection.mirrorLocalToRemote ||
+        rule.deleteRule == SyncDeleteRule.deleteRemoteWhenLocalDeleted ||
+        rule.deleteRule == SyncDeleteRule.deleteBothWays) {
+      addMissingRemoteDeletes();
+    }
+
+    if (rule.direction == SyncDirection.mirrorRemoteToLocal ||
+        rule.deleteRule == SyncDeleteRule.deleteLocalWhenRemoteDeleted ||
+        rule.deleteRule == SyncDeleteRule.deleteBothWays) {
+      addMissingLocalDeletes();
+    }
+
+    return itemsByKey.values.toList();
+  }
+
   String _relativePath(String from, String filePath) {
     final relativePath = path.relative(filePath, from: from);
     return path.split(relativePath).join('/');
@@ -636,6 +833,33 @@ class SyncRuleRepository {
         if (!changedAfterCreate) {
           throw StateError('Could not open remote folder $part.');
         }
+      }
+    }
+  }
+
+  Future<void> _changeRemoteDirectory(
+    FTPConnect ftpConnect,
+    String remotePath,
+  ) async {
+    final normalizedPath = _normalizeRemotePath(remotePath);
+    if (normalizedPath == '/' || normalizedPath == '.') {
+      await ftpConnect.changeDirectory('/');
+      return;
+    }
+
+    if (normalizedPath.startsWith('/')) {
+      await ftpConnect.changeDirectory('/');
+    }
+
+    final parts = normalizedPath
+        .split('/')
+        .where((part) => part.isNotEmpty && part != '.')
+        .toList();
+
+    for (final part in parts) {
+      final changed = await ftpConnect.changeDirectory(part);
+      if (!changed) {
+        throw StateError('Could not open remote folder $part.');
       }
     }
   }

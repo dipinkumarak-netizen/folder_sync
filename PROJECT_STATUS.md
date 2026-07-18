@@ -84,6 +84,7 @@ File Picker
 - Sync History Logging
 - Wi-Fi Only Sync Enforcement
 - Home Wi-Fi Name Check Foundation
+- Protected Delete Preview Screen
 
 ## History Module
 
@@ -175,8 +176,8 @@ Pending:
 
 - Remote File Diffing
 - Foreground Sync Progress
-- Protected Delete Preview
 - Destructive Mirror Delete Execution
+- Confirmed Delete Rule Execution
 
 Milestone 5
 
@@ -196,7 +197,6 @@ History
 
 Pending:
 
-- Sync Runner History Logging
 - Restore History Logging
 
 Milestone 8

@@ -10,6 +10,7 @@ import '../../ftp/presentation/ftp_server_list_screen.dart';
 import '../../ftp/providers/ftp_provider.dart';
 import '../models/sync_rule_model.dart';
 import '../providers/sync_rule_provider.dart';
+import 'sync_delete_preview_screen.dart';
 import 'sync_rule_form_screen.dart';
 
 /// ===============================================================
@@ -224,6 +225,7 @@ class _SyncRuleTile extends ConsumerWidget {
     final directionColor = _directionColor(rule.direction);
     final isRunning = rule.status == SyncRuleStatus.running;
     final statusColor = _statusColor(rule.status);
+    final showDeletePreview = _needsDeletePreview(rule);
 
     return OBCard(
       onTap: onEdit,
@@ -307,6 +309,17 @@ class _SyncRuleTile extends ConsumerWidget {
           const SizedBox(height: AppSizes.paddingM),
           Text(rule.lastMessage, style: Theme.of(context).textTheme.bodyMedium),
           const SizedBox(height: AppSizes.paddingM),
+          if (showDeletePreview) ...[
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: isRunning ? null : () => _openDeletePreview(context),
+                icon: const Icon(AppIcons.warning),
+                label: const Text('Preview Deletes'),
+              ),
+            ),
+            const SizedBox(height: AppSizes.paddingS),
+          ],
           Row(
             children: [
               Expanded(
@@ -338,6 +351,25 @@ class _SyncRuleTile extends ConsumerWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  void _openDeletePreview(BuildContext context) {
+    final server = ftpServer;
+    if (server == null) {
+      _showMessage(
+        context,
+        'The selected FTP server is not available.',
+        AppColors.error,
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SyncDeletePreviewScreen(rule: rule, ftpServer: server),
       ),
     );
   }
@@ -438,6 +470,12 @@ class _SyncRuleTile extends ConsumerWidget {
       SyncRuleStatus.success => 'Success',
       SyncRuleStatus.failed => 'Failed',
     };
+  }
+
+  bool _needsDeletePreview(SyncRuleModel rule) {
+    return rule.deleteRule != SyncDeleteRule.keepDeletedFiles ||
+        rule.direction == SyncDirection.mirrorLocalToRemote ||
+        rule.direction == SyncDirection.mirrorRemoteToLocal;
   }
 }
 
