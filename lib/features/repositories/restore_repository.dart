@@ -40,6 +40,34 @@ class RestorePreviewResult {
 
 enum RestoreConflictRule { skipExisting, overwriteExisting, keepBoth }
 
+class RestoreConflictPreviewResult {
+  final int filesToRestore;
+  final int filesSkipped;
+  final int filesOverwritten;
+  final int filesKeptBoth;
+  final int bytesToRestore;
+  final List<RestoreFileEntry> conflictingFiles;
+
+  const RestoreConflictPreviewResult({
+    required this.filesToRestore,
+    required this.filesSkipped,
+    required this.filesOverwritten,
+    required this.filesKeptBoth,
+    required this.bytesToRestore,
+    required this.conflictingFiles,
+  });
+
+  const RestoreConflictPreviewResult.empty()
+    : filesToRestore = 0,
+      filesSkipped = 0,
+      filesOverwritten = 0,
+      filesKeptBoth = 0,
+      bytesToRestore = 0,
+      conflictingFiles = const [];
+
+  int get existingConflicts => conflictingFiles.length;
+}
+
 class RestoreRunResult {
   final bool success;
   final String message;
@@ -217,6 +245,58 @@ class RestoreRepository {
         await ftpConnect.disconnect();
       }
     }
+  }
+
+  Future<RestoreConflictPreviewResult> previewLocalConflicts({
+    required List<RestoreFileEntry> files,
+    required String localFolderPath,
+    required RestoreConflictRule conflictRule,
+  }) async {
+    final localDirectory = Directory(localFolderPath);
+    if (!await localDirectory.exists()) {
+      return const RestoreConflictPreviewResult.empty();
+    }
+
+    final localRootPath = path.normalize(localDirectory.path);
+    final conflictingFiles = <RestoreFileEntry>[];
+    var filesToRestore = 0;
+    var bytesToRestore = 0;
+
+    for (final file in files) {
+      final localFilePath = path.normalize(
+        path.join(localRootPath, file.relativePath),
+      );
+      if (!path.isWithin(localRootPath, localFilePath)) {
+        throw StateError('Refusing to preview outside the destination folder.');
+      }
+
+      final exists = await File(localFilePath).exists();
+      if (exists) {
+        conflictingFiles.add(file);
+        if (conflictRule == RestoreConflictRule.skipExisting) {
+          continue;
+        }
+      }
+
+      filesToRestore += 1;
+      bytesToRestore += file.size;
+    }
+
+    final existingCount = conflictingFiles.length;
+    return RestoreConflictPreviewResult(
+      filesToRestore: filesToRestore,
+      filesSkipped: conflictRule == RestoreConflictRule.skipExisting
+          ? existingCount
+          : 0,
+      filesOverwritten: conflictRule == RestoreConflictRule.overwriteExisting
+          ? existingCount
+          : 0,
+      filesKeptBoth: conflictRule == RestoreConflictRule.keepBoth
+          ? existingCount
+          : 0,
+      bytesToRestore: bytesToRestore,
+      conflictingFiles: conflictingFiles,
+    );
   }
 
   FTPConnect _connectFor(FtpServerModel ftpServer) {

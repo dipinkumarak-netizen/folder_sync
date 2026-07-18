@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -63,6 +65,7 @@ class _RestoreScreenState extends ConsumerState<RestoreScreen> {
     }
 
     _localFolderController.text = folderPath;
+    _refreshConflictPreview();
   }
 
   Future<void> _previewFiles(List<FtpServerModel> ftpServers) async {
@@ -80,6 +83,8 @@ class _RestoreScreenState extends ConsumerState<RestoreScreen> {
         .previewFiles(
           ftpServer: ftpServer,
           remoteFolderPath: _remoteFolderController.text.trim(),
+          localFolderPath: _localFolderController.text.trim(),
+          conflictRule: _conflictRule,
         );
 
     if (!mounted) {
@@ -202,6 +207,7 @@ class _RestoreScreenState extends ConsumerState<RestoreScreen> {
                         setState(() {
                           _conflictRule = value;
                         });
+                        _refreshConflictPreview();
                       },
               ),
               const SizedBox(height: AppSizes.paddingM),
@@ -229,7 +235,7 @@ class _RestoreScreenState extends ConsumerState<RestoreScreen> {
               const SizedBox(height: AppSizes.paddingM),
               if (ftpServers.isEmpty) const _MissingFtpServerCard(),
               if (ftpServers.isEmpty) const SizedBox(height: AppSizes.paddingM),
-              _PreviewList(state: restoreState),
+              _PreviewList(state: restoreState, conflictRule: _conflictRule),
             ],
           ),
         ),
@@ -246,6 +252,23 @@ class _RestoreScreenState extends ConsumerState<RestoreScreen> {
       RestoreConflictRule.keepBoth =>
         'Existing destination files will be kept and restored files will get copy names.',
     };
+  }
+
+  void _refreshConflictPreview() {
+    final localFolderPath = _localFolderController.text.trim();
+    final restoreState = ref.read(restoreProvider);
+    if (localFolderPath.isEmpty || restoreState.previewFiles.isEmpty) {
+      return;
+    }
+
+    unawaited(
+      ref
+          .read(restoreProvider.notifier)
+          .refreshConflictPreview(
+            localFolderPath: localFolderPath,
+            conflictRule: _conflictRule,
+          ),
+    );
   }
 }
 
@@ -390,9 +413,10 @@ class _RestoreFormCard extends StatelessWidget {
 }
 
 class _PreviewList extends StatelessWidget {
-  const _PreviewList({required this.state});
+  const _PreviewList({required this.state, required this.conflictRule});
 
   final RestoreState state;
+  final RestoreConflictRule conflictRule;
 
   @override
   Widget build(BuildContext context) {
@@ -421,6 +445,12 @@ class _PreviewList extends StatelessWidget {
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: AppColors.textHint),
+          ),
+          const SizedBox(height: AppSizes.paddingM),
+          _ConflictSummary(
+            state: state,
+            conflictRule: conflictRule,
+            formatBytes: _formatBytes,
           ),
           const SizedBox(height: AppSizes.paddingM),
           ...state.previewFiles.take(25).map((file) {
@@ -463,6 +493,129 @@ class _PreviewList extends StatelessWidget {
     }
 
     return '${(mb / 1024).toStringAsFixed(1)} GB';
+  }
+}
+
+class _ConflictSummary extends StatelessWidget {
+  const _ConflictSummary({
+    required this.state,
+    required this.conflictRule,
+    required this.formatBytes,
+  });
+
+  final RestoreState state;
+  final RestoreConflictRule conflictRule;
+  final String Function(int bytes) formatBytes;
+
+  @override
+  Widget build(BuildContext context) {
+    final summary = state.conflictPreview;
+    final conflictCount = summary.existingConflicts;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: AppSizes.paddingS,
+          runSpacing: AppSizes.paddingS,
+          children: [
+            _SummaryBadge(
+              label: 'Restore ${summary.filesToRestore}',
+              color: AppColors.success,
+            ),
+            _SummaryBadge(
+              label: 'Conflicts $conflictCount',
+              color: conflictCount == 0 ? AppColors.success : AppColors.warning,
+            ),
+            _SummaryBadge(
+              label: 'Skip ${summary.filesSkipped}',
+              color: AppColors.textHint,
+            ),
+            _SummaryBadge(
+              label: 'Overwrite ${summary.filesOverwritten}',
+              color: AppColors.error,
+            ),
+            _SummaryBadge(
+              label: 'Keep Both ${summary.filesKeptBoth}',
+              color: AppColors.info,
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSizes.paddingS),
+        Text(
+          '${_conflictRuleLabel(conflictRule)} will restore ${summary.filesToRestore} file(s), ${formatBytes(summary.bytesToRestore)}.',
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: AppColors.textHint),
+        ),
+        if (summary.conflictingFiles.isNotEmpty) ...[
+          const SizedBox(height: AppSizes.paddingM),
+          Text(
+            'Local Conflicts',
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          const SizedBox(height: AppSizes.paddingS),
+          ...summary.conflictingFiles.take(10).map((file) {
+            return ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(AppIcons.warning, color: AppColors.warning),
+              title: Text(file.relativePath),
+              subtitle: Text(_conflictActionLabel(conflictRule)),
+            );
+          }),
+          if (summary.conflictingFiles.length > 10)
+            Text(
+              '+ ${summary.conflictingFiles.length - 10} more conflict(s)',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textHint),
+            ),
+        ],
+      ],
+    );
+  }
+
+  String _conflictRuleLabel(RestoreConflictRule rule) {
+    return switch (rule) {
+      RestoreConflictRule.skipExisting => 'Skip Existing',
+      RestoreConflictRule.overwriteExisting => 'Overwrite Existing',
+      RestoreConflictRule.keepBoth => 'Keep Both',
+    };
+  }
+
+  String _conflictActionLabel(RestoreConflictRule rule) {
+    return switch (rule) {
+      RestoreConflictRule.skipExisting => 'Will be skipped',
+      RestoreConflictRule.overwriteExisting => 'Will be overwritten',
+      RestoreConflictRule.keepBoth => 'Will be restored as a copy',
+    };
+  }
+}
+
+class _SummaryBadge extends StatelessWidget {
+  const _SummaryBadge({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSizes.paddingS,
+        vertical: AppSizes.paddingXS,
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(AppSizes.radiusS),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color),
+      ),
+    );
   }
 }
 

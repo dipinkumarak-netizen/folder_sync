@@ -97,6 +97,7 @@ File Picker
 - Manual FTP Restore Runner
 - Existing Local File Skip Protection
 - Restore Conflict Rules
+- Restore Local Conflict Preview
 - Foreground Restore Progress
 - Restore History Logging
 
@@ -231,6 +232,7 @@ Restore
 - FTP Restore Preview
 - Manual FTP Restore Runner
 - Skip / Overwrite / Keep Both Conflict Rules
+- Local Conflict Count Preview
 - Restore History Logging
 
 Milestone 7

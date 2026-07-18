@@ -21,6 +21,7 @@ class RestoreState {
   final RestoreStatus status;
   final String message;
   final List<RestoreFileEntry> previewFiles;
+  final RestoreConflictPreviewResult conflictPreview;
   final int lastFilesRestored;
   final int lastFilesSkipped;
   final int lastFilesOverwritten;
@@ -31,6 +32,7 @@ class RestoreState {
     this.status = RestoreStatus.idle,
     this.message = 'Select a backup folder to restore.',
     this.previewFiles = const [],
+    this.conflictPreview = const RestoreConflictPreviewResult.empty(),
     this.lastFilesRestored = 0,
     this.lastFilesSkipped = 0,
     this.lastFilesOverwritten = 0,
@@ -42,6 +44,7 @@ class RestoreState {
     RestoreStatus? status,
     String? message,
     List<RestoreFileEntry>? previewFiles,
+    RestoreConflictPreviewResult? conflictPreview,
     int? lastFilesRestored,
     int? lastFilesSkipped,
     int? lastFilesOverwritten,
@@ -52,6 +55,7 @@ class RestoreState {
       status: status ?? this.status,
       message: message ?? this.message,
       previewFiles: previewFiles ?? this.previewFiles,
+      conflictPreview: conflictPreview ?? this.conflictPreview,
       lastFilesRestored: lastFilesRestored ?? this.lastFilesRestored,
       lastFilesSkipped: lastFilesSkipped ?? this.lastFilesSkipped,
       lastFilesOverwritten: lastFilesOverwritten ?? this.lastFilesOverwritten,
@@ -76,24 +80,64 @@ class RestoreNotifier extends StateNotifier<RestoreState> {
   Future<RestorePreviewResult> previewFiles({
     required FtpServerModel ftpServer,
     required String remoteFolderPath,
+    required String localFolderPath,
+    required RestoreConflictRule conflictRule,
   }) async {
     state = state.copyWith(
       status: RestoreStatus.previewing,
       message: 'Scanning remote backup folder...',
       previewFiles: const [],
+      conflictPreview: const RestoreConflictPreviewResult.empty(),
     );
 
     final result = await _repository.previewFiles(
       ftpServer: ftpServer,
       remoteFolderPath: remoteFolderPath,
     );
+    final conflictPreview = result.success
+        ? await _repository.previewLocalConflicts(
+            files: result.files,
+            localFolderPath: localFolderPath,
+            conflictRule: conflictRule,
+          )
+        : const RestoreConflictPreviewResult.empty();
     state = state.copyWith(
       status: result.success ? RestoreStatus.ready : RestoreStatus.failed,
-      message: result.message,
+      message: _previewMessage(result, conflictPreview),
       previewFiles: result.files,
+      conflictPreview: conflictPreview,
     );
 
     return result;
+  }
+
+  Future<void> refreshConflictPreview({
+    required String localFolderPath,
+    required RestoreConflictRule conflictRule,
+  }) async {
+    if (state.previewFiles.isEmpty) {
+      state = state.copyWith(
+        conflictPreview: const RestoreConflictPreviewResult.empty(),
+      );
+      return;
+    }
+
+    final conflictPreview = await _repository.previewLocalConflicts(
+      files: state.previewFiles,
+      localFolderPath: localFolderPath,
+      conflictRule: conflictRule,
+    );
+    state = state.copyWith(
+      message: _previewMessage(
+        RestorePreviewResult(
+          success: true,
+          message: 'Preview found ${state.previewFiles.length} file(s).',
+          files: state.previewFiles,
+        ),
+        conflictPreview,
+      ),
+      conflictPreview: conflictPreview,
+    );
   }
 
   Future<RestoreRunResult> runRestore({
@@ -178,6 +222,21 @@ class RestoreNotifier extends StateNotifier<RestoreState> {
         bytesChanged: result.bytesRestored,
       ),
     );
+  }
+
+  String _previewMessage(
+    RestorePreviewResult result,
+    RestoreConflictPreviewResult conflictPreview,
+  ) {
+    if (!result.success || result.files.isEmpty) {
+      return result.message;
+    }
+
+    if (conflictPreview.existingConflicts == 0) {
+      return '${result.message} No local conflicts.';
+    }
+
+    return '${result.message} ${conflictPreview.existingConflicts} local conflict(s) found.';
   }
 }
 
