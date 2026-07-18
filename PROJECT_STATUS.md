@@ -100,6 +100,7 @@ File Picker
 - Restore Local Conflict Preview
 - Restore Filters
 - Restore Progress Details
+- Restore Cancellation Support
 - Foreground Restore Progress
 - Restore History Logging
 
@@ -237,6 +238,7 @@ Restore
 - Local Conflict Count Preview
 - Subfolder / Hidden / Pattern / Size Restore Filters
 - Restore Progress UI and Foreground Updates
+- Restore Cancellation UI and History
 - Restore History Logging
 
 Milestone 7

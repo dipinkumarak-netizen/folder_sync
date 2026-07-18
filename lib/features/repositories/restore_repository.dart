@@ -87,6 +87,7 @@ class RestoreConflictPreviewResult {
 
 class RestoreRunResult {
   final bool success;
+  final bool cancelled;
   final String message;
   final int filesRestored;
   final int filesSkipped;
@@ -96,6 +97,7 @@ class RestoreRunResult {
 
   const RestoreRunResult({
     required this.success,
+    this.cancelled = false,
     required this.message,
     required this.filesRestored,
     required this.filesSkipped,
@@ -139,6 +141,16 @@ class RestoreProgressUpdate {
 
 typedef RestoreProgressCallback =
     FutureOr<void> Function(RestoreProgressUpdate update);
+
+class RestoreCancellationToken {
+  bool _isCancelled = false;
+
+  bool get isCancelled => _isCancelled;
+
+  void cancel() {
+    _isCancelled = true;
+  }
+}
 
 class RestoreRepository {
   RestoreRepository._();
@@ -198,6 +210,7 @@ class RestoreRepository {
     required RestoreConflictRule conflictRule,
     required RestoreFilterOptions filterOptions,
     RestoreProgressCallback? onProgress,
+    RestoreCancellationToken? cancellationToken,
   }) async {
     final localDirectory = Directory(localFolderPath);
     if (!await localDirectory.exists()) {
@@ -243,6 +256,22 @@ class RestoreRepository {
       var bytesRestored = 0;
 
       for (var index = 0; index < files.length; index += 1) {
+        if (cancellationToken?.isCancelled == true) {
+          return RestoreRunResult(
+            success: false,
+            cancelled: true,
+            message: _cancelledMessage(
+              filesRestored: filesRestored,
+              filesSkipped: filesSkipped,
+            ),
+            filesRestored: filesRestored,
+            filesSkipped: filesSkipped,
+            filesOverwritten: filesOverwritten,
+            filesKeptBoth: filesKeptBoth,
+            bytesRestored: bytesRestored,
+          );
+        }
+
         final file = files[index];
         final action = await _downloadFile(
           ftpConnect: ftpConnect,
@@ -314,6 +343,14 @@ class RestoreRepository {
         await ftpConnect.disconnect();
       }
     }
+  }
+
+  String _cancelledMessage({
+    required int filesRestored,
+    required int filesSkipped,
+  }) {
+    final skipNote = filesSkipped == 0 ? '' : ' Skipped $filesSkipped.';
+    return 'Restore cancelled after $filesRestored restored file(s).$skipNote';
   }
 
   Future<RestoreConflictPreviewResult> previewLocalConflicts({

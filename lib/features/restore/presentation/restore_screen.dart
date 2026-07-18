@@ -175,7 +175,8 @@ class _RestoreScreenState extends ConsumerState<RestoreScreen> {
     final restoreState = ref.watch(restoreProvider);
     final isBusy =
         restoreState.status == RestoreStatus.previewing ||
-        restoreState.status == RestoreStatus.running;
+        restoreState.status == RestoreStatus.running ||
+        restoreState.status == RestoreStatus.cancelling;
 
     if (_selectedFtpServerId == null && ftpServers.length == 1) {
       _selectedFtpServerId = ftpServers.first.id;
@@ -268,6 +269,22 @@ class _RestoreScreenState extends ConsumerState<RestoreScreen> {
                   ),
                 ],
               ),
+              if (restoreState.status == RestoreStatus.running ||
+                  restoreState.status == RestoreStatus.cancelling) ...[
+                const SizedBox(height: AppSizes.paddingM),
+                OutlinedButton.icon(
+                  onPressed: restoreState.cancelRequested
+                      ? null
+                      : () =>
+                            ref.read(restoreProvider.notifier).cancelRestore(),
+                  icon: const Icon(Icons.stop_circle_rounded),
+                  label: Text(
+                    restoreState.cancelRequested
+                        ? 'Cancelling Restore'
+                        : 'Cancel Restore',
+                  ),
+                ),
+              ],
               const SizedBox(height: AppSizes.paddingM),
               if (ftpServers.isEmpty) const _MissingFtpServerCard(),
               if (ftpServers.isEmpty) const SizedBox(height: AppSizes.paddingM),
@@ -339,7 +356,10 @@ class _RestoreOverview extends StatelessWidget {
     final statusColor = switch (state.status) {
       RestoreStatus.success => AppColors.success,
       RestoreStatus.failed => AppColors.error,
-      RestoreStatus.running || RestoreStatus.previewing => AppColors.warning,
+      RestoreStatus.cancelled => AppColors.warning,
+      RestoreStatus.running ||
+      RestoreStatus.previewing ||
+      RestoreStatus.cancelling => AppColors.warning,
       RestoreStatus.ready => AppColors.info,
       RestoreStatus.idle => AppColors.restore,
     };
@@ -368,7 +388,8 @@ class _RestoreOverview extends StatelessWidget {
                     context,
                   ).textTheme.bodyMedium?.copyWith(color: AppColors.textHint),
                 ),
-                if (state.status == RestoreStatus.running) ...[
+                if (state.status == RestoreStatus.running ||
+                    state.status == RestoreStatus.cancelling) ...[
                   const SizedBox(height: AppSizes.paddingM),
                   LinearProgressIndicator(value: _progressValue(state)),
                   const SizedBox(height: AppSizes.paddingS),
@@ -581,7 +602,8 @@ class _PreviewList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (state.status == RestoreStatus.previewing ||
-        state.status == RestoreStatus.running) {
+        state.status == RestoreStatus.running ||
+        state.status == RestoreStatus.cancelling) {
       return const OBCard(child: Center(child: CircularProgressIndicator()));
     }
 

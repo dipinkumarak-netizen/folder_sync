@@ -15,7 +15,16 @@ import '../services/restore_foreground_service.dart';
 /// Description : Riverpod provider for FTP restore operations.
 /// ===============================================================
 
-enum RestoreStatus { idle, previewing, ready, running, success, failed }
+enum RestoreStatus {
+  idle,
+  previewing,
+  ready,
+  running,
+  cancelling,
+  success,
+  failed,
+  cancelled,
+}
 
 class RestoreState {
   final RestoreStatus status;
@@ -25,6 +34,7 @@ class RestoreState {
   final int currentFileIndex;
   final int totalFiles;
   final String currentFilePath;
+  final bool cancelRequested;
   final int lastFilesRestored;
   final int lastFilesSkipped;
   final int lastFilesOverwritten;
@@ -39,6 +49,7 @@ class RestoreState {
     this.currentFileIndex = 0,
     this.totalFiles = 0,
     this.currentFilePath = '',
+    this.cancelRequested = false,
     this.lastFilesRestored = 0,
     this.lastFilesSkipped = 0,
     this.lastFilesOverwritten = 0,
@@ -54,6 +65,7 @@ class RestoreState {
     int? currentFileIndex,
     int? totalFiles,
     String? currentFilePath,
+    bool? cancelRequested,
     int? lastFilesRestored,
     int? lastFilesSkipped,
     int? lastFilesOverwritten,
@@ -68,6 +80,7 @@ class RestoreState {
       currentFileIndex: currentFileIndex ?? this.currentFileIndex,
       totalFiles: totalFiles ?? this.totalFiles,
       currentFilePath: currentFilePath ?? this.currentFilePath,
+      cancelRequested: cancelRequested ?? this.cancelRequested,
       lastFilesRestored: lastFilesRestored ?? this.lastFilesRestored,
       lastFilesSkipped: lastFilesSkipped ?? this.lastFilesSkipped,
       lastFilesOverwritten: lastFilesOverwritten ?? this.lastFilesOverwritten,
@@ -88,6 +101,7 @@ class RestoreNotifier extends StateNotifier<RestoreState> {
   final RestoreRepository _repository;
   final HistoryNotifier _historyNotifier;
   final AppSettingsModel Function() _readSettings;
+  RestoreCancellationToken? _activeCancellationToken;
 
   Future<RestorePreviewResult> previewFiles({
     required FtpServerModel ftpServer,
@@ -163,7 +177,26 @@ class RestoreNotifier extends StateNotifier<RestoreState> {
       currentFileIndex: 0,
       totalFiles: 0,
       currentFilePath: '',
+      cancelRequested: false,
     );
+  }
+
+  Future<void> cancelRestore() async {
+    final token = _activeCancellationToken;
+    if (token == null || token.isCancelled) {
+      return;
+    }
+
+    token.cancel();
+    const message = 'Cancelling restore after the current file...';
+    state = state.copyWith(
+      status: RestoreStatus.cancelling,
+      message: message,
+      cancelRequested: true,
+    );
+    if (_readSettings().showForegroundNotifications) {
+      await RestoreForegroundServiceBridge.update(message: message);
+    }
   }
 
   Future<RestoreRunResult> runRestore({
@@ -179,7 +212,10 @@ class RestoreNotifier extends StateNotifier<RestoreState> {
       currentFileIndex: 0,
       totalFiles: state.conflictPreview.filesToRestore,
       currentFilePath: '',
+      cancelRequested: false,
     );
+    final cancellationToken = RestoreCancellationToken();
+    _activeCancellationToken = cancellationToken;
 
     var foregroundStarted = false;
     if (_readSettings().showForegroundNotifications) {
@@ -196,10 +232,14 @@ class RestoreNotifier extends StateNotifier<RestoreState> {
         localFolderPath: localFolderPath,
         conflictRule: conflictRule,
         filterOptions: filterOptions,
+        cancellationToken: cancellationToken,
         onProgress: (progress) async {
           final message =
               'Processed ${progress.currentFileIndex}/${progress.totalFiles}: ${progress.currentFilePath}';
           state = state.copyWith(
+            status: cancellationToken.isCancelled
+                ? RestoreStatus.cancelling
+                : RestoreStatus.running,
             message: message,
             currentFileIndex: progress.currentFileIndex,
             totalFiles: progress.totalFiles,
@@ -209,6 +249,7 @@ class RestoreNotifier extends StateNotifier<RestoreState> {
             lastFilesOverwritten: progress.filesOverwritten,
             lastFilesKeptBoth: progress.filesKeptBoth,
             lastBytesRestored: progress.bytesRestored,
+            cancelRequested: cancellationToken.isCancelled,
           );
 
           if (foregroundStarted) {
@@ -227,17 +268,23 @@ class RestoreNotifier extends StateNotifier<RestoreState> {
         bytesRestored: 0,
       );
     } finally {
+      _activeCancellationToken = null;
       if (foregroundStarted) {
         await RestoreForegroundServiceBridge.stop();
       }
     }
 
     state = state.copyWith(
-      status: result.success ? RestoreStatus.success : RestoreStatus.failed,
+      status: result.cancelled
+          ? RestoreStatus.cancelled
+          : result.success
+          ? RestoreStatus.success
+          : RestoreStatus.failed,
       message: result.message,
       currentFileIndex: result.filesRestored + result.filesSkipped,
       totalFiles: result.filesRestored + result.filesSkipped,
       currentFilePath: '',
+      cancelRequested: false,
       lastFilesRestored: result.filesRestored,
       lastFilesSkipped: result.filesSkipped,
       lastFilesOverwritten: result.filesOverwritten,
@@ -266,6 +313,8 @@ class RestoreNotifier extends StateNotifier<RestoreState> {
         operationType: HistoryOperationType.restore,
         status: result.success
             ? HistoryEntryStatus.success
+            : result.cancelled
+            ? HistoryEntryStatus.cancelled
             : HistoryEntryStatus.failed,
         title: 'Restore from ${ftpServer.name}',
         message: result.message,
