@@ -23,6 +23,8 @@ class RestoreState {
   final List<RestoreFileEntry> previewFiles;
   final int lastFilesRestored;
   final int lastFilesSkipped;
+  final int lastFilesOverwritten;
+  final int lastFilesKeptBoth;
   final int lastBytesRestored;
 
   const RestoreState({
@@ -31,6 +33,8 @@ class RestoreState {
     this.previewFiles = const [],
     this.lastFilesRestored = 0,
     this.lastFilesSkipped = 0,
+    this.lastFilesOverwritten = 0,
+    this.lastFilesKeptBoth = 0,
     this.lastBytesRestored = 0,
   });
 
@@ -40,6 +44,8 @@ class RestoreState {
     List<RestoreFileEntry>? previewFiles,
     int? lastFilesRestored,
     int? lastFilesSkipped,
+    int? lastFilesOverwritten,
+    int? lastFilesKeptBoth,
     int? lastBytesRestored,
   }) {
     return RestoreState(
@@ -48,6 +54,8 @@ class RestoreState {
       previewFiles: previewFiles ?? this.previewFiles,
       lastFilesRestored: lastFilesRestored ?? this.lastFilesRestored,
       lastFilesSkipped: lastFilesSkipped ?? this.lastFilesSkipped,
+      lastFilesOverwritten: lastFilesOverwritten ?? this.lastFilesOverwritten,
+      lastFilesKeptBoth: lastFilesKeptBoth ?? this.lastFilesKeptBoth,
       lastBytesRestored: lastBytesRestored ?? this.lastBytesRestored,
     );
   }
@@ -92,6 +100,7 @@ class RestoreNotifier extends StateNotifier<RestoreState> {
     required FtpServerModel ftpServer,
     required String remoteFolderPath,
     required String localFolderPath,
+    required RestoreConflictRule conflictRule,
   }) async {
     state = state.copyWith(
       status: RestoreStatus.running,
@@ -109,6 +118,7 @@ class RestoreNotifier extends StateNotifier<RestoreState> {
         ftpServer: ftpServer,
         remoteFolderPath: remoteFolderPath,
         localFolderPath: localFolderPath,
+        conflictRule: conflictRule,
       );
     } catch (_) {
       result = const RestoreRunResult(
@@ -116,6 +126,8 @@ class RestoreNotifier extends StateNotifier<RestoreState> {
         message: 'Restore failed unexpectedly.',
         filesRestored: 0,
         filesSkipped: 0,
+        filesOverwritten: 0,
+        filesKeptBoth: 0,
         bytesRestored: 0,
       );
     } finally {
@@ -129,6 +141,8 @@ class RestoreNotifier extends StateNotifier<RestoreState> {
       message: result.message,
       lastFilesRestored: result.filesRestored,
       lastFilesSkipped: result.filesSkipped,
+      lastFilesOverwritten: result.filesOverwritten,
+      lastFilesKeptBoth: result.filesKeptBoth,
       lastBytesRestored: result.bytesRestored,
     );
     await _writeHistory(

@@ -38,11 +38,15 @@ class RestorePreviewResult {
   int get totalBytes => files.fold<int>(0, (sum, file) => sum + file.size);
 }
 
+enum RestoreConflictRule { skipExisting, overwriteExisting, keepBoth }
+
 class RestoreRunResult {
   final bool success;
   final String message;
   final int filesRestored;
   final int filesSkipped;
+  final int filesOverwritten;
+  final int filesKeptBoth;
   final int bytesRestored;
 
   const RestoreRunResult({
@@ -50,9 +54,13 @@ class RestoreRunResult {
     required this.message,
     required this.filesRestored,
     required this.filesSkipped,
+    required this.filesOverwritten,
+    required this.filesKeptBoth,
     required this.bytesRestored,
   });
 }
+
+enum _RestoreDownloadAction { restored, skipped, overwritten, keptBoth }
 
 class RestoreRepository {
   RestoreRepository._();
@@ -107,6 +115,7 @@ class RestoreRepository {
     required FtpServerModel ftpServer,
     required String remoteFolderPath,
     required String localFolderPath,
+    required RestoreConflictRule conflictRule,
   }) async {
     final localDirectory = Directory(localFolderPath);
     if (!await localDirectory.exists()) {
@@ -115,6 +124,8 @@ class RestoreRepository {
         message: 'Destination folder is not available.',
         filesRestored: 0,
         filesSkipped: 0,
+        filesOverwritten: 0,
+        filesKeptBoth: 0,
         bytesRestored: 0,
       );
     }
@@ -130,6 +141,8 @@ class RestoreRepository {
           message: 'Could not connect to the FTP server.',
           filesRestored: 0,
           filesSkipped: 0,
+          filesOverwritten: 0,
+          filesKeptBoth: 0,
           bytesRestored: 0,
         );
       }
@@ -142,34 +155,51 @@ class RestoreRepository {
 
       var filesRestored = 0;
       var filesSkipped = 0;
+      var filesOverwritten = 0;
+      var filesKeptBoth = 0;
       var bytesRestored = 0;
 
       for (final file in files) {
-        final restored = await _downloadFile(
+        final action = await _downloadFile(
           ftpConnect: ftpConnect,
           remoteRoot: remoteRoot,
           localDirectory: localDirectory,
           remoteFile: file,
+          conflictRule: conflictRule,
         );
-        if (!restored) {
-          filesSkipped += 1;
-          continue;
+        switch (action) {
+          case _RestoreDownloadAction.skipped:
+            filesSkipped += 1;
+          case _RestoreDownloadAction.overwritten:
+            filesOverwritten += 1;
+            filesRestored += 1;
+            bytesRestored += file.size;
+          case _RestoreDownloadAction.keptBoth:
+            filesKeptBoth += 1;
+            filesRestored += 1;
+            bytesRestored += file.size;
+          case _RestoreDownloadAction.restored:
+            filesRestored += 1;
+            bytesRestored += file.size;
         }
-
-        filesRestored += 1;
-        bytesRestored += file.size;
       }
 
-      final skipNote = filesSkipped == 0
+      final skipNote = filesSkipped == 0 ? '' : ' Skipped $filesSkipped.';
+      final overwriteNote = filesOverwritten == 0
           ? ''
-          : ' Skipped $filesSkipped existing file(s).';
+          : ' Overwrote $filesOverwritten.';
+      final keepBothNote = filesKeptBoth == 0
+          ? ''
+          : ' Kept both for $filesKeptBoth.';
       return RestoreRunResult(
         success: true,
         message: filesRestored == 0
             ? 'No files restored.$skipNote'
-            : 'Restored $filesRestored file(s).$skipNote',
+            : 'Restored $filesRestored file(s).$skipNote$overwriteNote$keepBothNote',
         filesRestored: filesRestored,
         filesSkipped: filesSkipped,
+        filesOverwritten: filesOverwritten,
+        filesKeptBoth: filesKeptBoth,
         bytesRestored: bytesRestored,
       );
     } catch (_) {
@@ -178,6 +208,8 @@ class RestoreRepository {
         message: 'Restore failed. Check folders and FTP server.',
         filesRestored: 0,
         filesSkipped: 0,
+        filesOverwritten: 0,
+        filesKeptBoth: 0,
         bytesRestored: 0,
       );
     } finally {
@@ -256,11 +288,12 @@ class RestoreRepository {
     }
   }
 
-  Future<bool> _downloadFile({
+  Future<_RestoreDownloadAction> _downloadFile({
     required FTPConnect ftpConnect,
     required String remoteRoot,
     required Directory localDirectory,
     required RestoreFileEntry remoteFile,
+    required RestoreConflictRule conflictRule,
   }) async {
     final localRootPath = path.normalize(localDirectory.path);
     final localFilePath = path.normalize(
@@ -270,11 +303,24 @@ class RestoreRepository {
       throw StateError('Refusing to restore outside the destination folder.');
     }
 
-    final localFile = File(localFilePath);
-    if (await localFile.exists()) {
-      return false;
+    final downloadAction = await _downloadActionFor(
+      localFilePath: localFilePath,
+      conflictRule: conflictRule,
+    );
+    if (downloadAction == _RestoreDownloadAction.skipped) {
+      return downloadAction;
     }
 
+    final localFile = File(
+      _targetPathForConflict(
+        localFilePath: localFilePath,
+        conflictRule: conflictRule,
+      ),
+    );
+    if (downloadAction == _RestoreDownloadAction.overwritten &&
+        await localFile.exists()) {
+      await localFile.delete();
+    }
     await localFile.parent.create(recursive: true);
     await _changeRemoteDirectory(ftpConnect, remoteRoot);
     final remoteDirectory = path.posix.dirname(remoteFile.relativePath);
@@ -290,7 +336,50 @@ class RestoreRepository {
       throw StateError('Could not restore ${remoteFile.relativePath}.');
     }
 
-    return true;
+    return downloadAction;
+  }
+
+  Future<_RestoreDownloadAction> _downloadActionFor({
+    required String localFilePath,
+    required RestoreConflictRule conflictRule,
+  }) async {
+    if (!await File(localFilePath).exists()) {
+      return _RestoreDownloadAction.restored;
+    }
+
+    return switch (conflictRule) {
+      RestoreConflictRule.skipExisting => _RestoreDownloadAction.skipped,
+      RestoreConflictRule.overwriteExisting =>
+        _RestoreDownloadAction.overwritten,
+      RestoreConflictRule.keepBoth => _RestoreDownloadAction.keptBoth,
+    };
+  }
+
+  String _targetPathForConflict({
+    required String localFilePath,
+    required RestoreConflictRule conflictRule,
+  }) {
+    if (conflictRule != RestoreConflictRule.keepBoth ||
+        !File(localFilePath).existsSync()) {
+      return localFilePath;
+    }
+
+    final directory = path.dirname(localFilePath);
+    final extension = path.extension(localFilePath);
+    final basename = path.basenameWithoutExtension(localFilePath);
+
+    var copyNumber = 1;
+    while (true) {
+      final candidate = path.join(
+        directory,
+        '$basename.restored-copy-$copyNumber$extension',
+      );
+      if (!File(candidate).existsSync()) {
+        return candidate;
+      }
+
+      copyNumber += 1;
+    }
   }
 
   String _safeRelativePath(String relativePath) {

@@ -9,6 +9,7 @@ import '../../../core/widgets/ob_card.dart';
 import '../../ftp/models/ftp_server_model.dart';
 import '../../ftp/presentation/ftp_server_list_screen.dart';
 import '../../ftp/providers/ftp_provider.dart';
+import '../../repositories/restore_repository.dart';
 import '../providers/restore_provider.dart';
 
 /// ===============================================================
@@ -31,6 +32,7 @@ class _RestoreScreenState extends ConsumerState<RestoreScreen> {
   final _localFolderController = TextEditingController();
 
   String? _selectedFtpServerId;
+  RestoreConflictRule _conflictRule = RestoreConflictRule.skipExisting;
 
   @override
   void dispose() {
@@ -104,9 +106,7 @@ class _RestoreScreenState extends ConsumerState<RestoreScreen> {
       builder: (context) {
         return AlertDialog(
           title: const Text('Start Restore'),
-          content: const Text(
-            'Files that already exist in the destination folder will be skipped.',
-          ),
+          content: Text(_confirmationMessage(_conflictRule)),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -131,6 +131,7 @@ class _RestoreScreenState extends ConsumerState<RestoreScreen> {
           ftpServer: ftpServer,
           remoteFolderPath: _remoteFolderController.text.trim(),
           localFolderPath: _localFolderController.text.trim(),
+          conflictRule: _conflictRule,
         );
 
     if (!mounted) {
@@ -181,6 +182,7 @@ class _RestoreScreenState extends ConsumerState<RestoreScreen> {
                 selectedFtpServerId: _selectedFtpServerId,
                 remoteFolderController: _remoteFolderController,
                 localFolderController: _localFolderController,
+                conflictRule: _conflictRule,
                 inputDecoration: _inputDecoration,
                 onFtpChanged: isBusy
                     ? null
@@ -190,6 +192,17 @@ class _RestoreScreenState extends ConsumerState<RestoreScreen> {
                         });
                       },
                 onPickDestination: isBusy ? null : _pickDestinationFolder,
+                onConflictChanged: isBusy
+                    ? null
+                    : (value) {
+                        if (value == null) {
+                          return;
+                        }
+
+                        setState(() {
+                          _conflictRule = value;
+                        });
+                      },
               ),
               const SizedBox(height: AppSizes.paddingM),
               Row(
@@ -222,6 +235,17 @@ class _RestoreScreenState extends ConsumerState<RestoreScreen> {
         ),
       ),
     );
+  }
+
+  String _confirmationMessage(RestoreConflictRule conflictRule) {
+    return switch (conflictRule) {
+      RestoreConflictRule.skipExisting =>
+        'Files that already exist in the destination folder will be skipped.',
+      RestoreConflictRule.overwriteExisting =>
+        'Existing destination files with the same path will be overwritten.',
+      RestoreConflictRule.keepBoth =>
+        'Existing destination files will be kept and restored files will get copy names.',
+    };
   }
 }
 
@@ -279,18 +303,22 @@ class _RestoreFormCard extends StatelessWidget {
     required this.selectedFtpServerId,
     required this.remoteFolderController,
     required this.localFolderController,
+    required this.conflictRule,
     required this.inputDecoration,
     required this.onFtpChanged,
     required this.onPickDestination,
+    required this.onConflictChanged,
   });
 
   final List<FtpServerModel> ftpServers;
   final String? selectedFtpServerId;
   final TextEditingController remoteFolderController;
   final TextEditingController localFolderController;
+  final RestoreConflictRule conflictRule;
   final InputDecoration Function(String label, IconData icon) inputDecoration;
   final ValueChanged<String?>? onFtpChanged;
   final VoidCallback? onPickDestination;
+  final ValueChanged<RestoreConflictRule?>? onConflictChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -335,9 +363,29 @@ class _RestoreFormCard extends StatelessWidget {
             validator: (value) =>
                 value == null || value.trim().isEmpty ? 'Required' : null,
           ),
+          const SizedBox(height: AppSizes.paddingM),
+          DropdownButtonFormField<RestoreConflictRule>(
+            initialValue: conflictRule,
+            decoration: inputDecoration('Conflict Rule', AppIcons.warning),
+            items: RestoreConflictRule.values.map((rule) {
+              return DropdownMenuItem<RestoreConflictRule>(
+                value: rule,
+                child: Text(_conflictLabel(rule)),
+              );
+            }).toList(),
+            onChanged: onConflictChanged,
+          ),
         ],
       ),
     );
+  }
+
+  String _conflictLabel(RestoreConflictRule rule) {
+    return switch (rule) {
+      RestoreConflictRule.skipExisting => 'Skip Existing',
+      RestoreConflictRule.overwriteExisting => 'Overwrite Existing',
+      RestoreConflictRule.keepBoth => 'Keep Both',
+    };
   }
 }
 
