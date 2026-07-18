@@ -128,6 +128,7 @@ File Picker
 - Permission Shortcuts
 - Storage and Permission Readiness Screen
 - Android Readiness Checklist
+- Native Battery Optimization Request
 - Clear History Action
 
 ## History Module

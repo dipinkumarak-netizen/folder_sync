@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../services/battery_optimization_service.dart';
+
 /// ===============================================================
 /// OpenBackup
 /// File : permission_readiness_provider.dart
@@ -65,7 +67,7 @@ class PermissionReadinessNotifier
   }
 
   Future<void> requestBatteryOptimizationExemption() async {
-    await Permission.ignoreBatteryOptimizations.request();
+    await BatteryOptimizationService.requestIgnoreBatteryOptimizations();
     await refresh();
   }
 
@@ -73,8 +75,8 @@ class PermissionReadinessNotifier
     final notification = await Permission.notification.status;
     final nearbyWifi = await Permission.nearbyWifiDevices.status;
     final location = await Permission.locationWhenInUse.status;
-    final batteryOptimization =
-        await Permission.ignoreBatteryOptimizations.status;
+    final batteryOptimizationIgnored =
+        await BatteryOptimizationService.isIgnoringBatteryOptimizations();
     final storageWritable = await _canWriteAppStorage();
 
     return PermissionReadinessSnapshot(
@@ -130,13 +132,17 @@ class PermissionReadinessNotifier
         PermissionReadinessItem(
           id: 'battery',
           title: 'Battery Optimization',
-          message: batteryOptimization.isGranted
+          message: batteryOptimizationIgnored == true
               ? 'Android is less likely to interrupt scheduled work.'
-              : 'Scheduled jobs may be delayed by battery optimization.',
-          status: batteryOptimization.isGranted
+              : batteryOptimizationIgnored == false
+              ? 'Scheduled jobs may be delayed by battery optimization.'
+              : 'Battery optimization status is unavailable on this device.',
+          status: batteryOptimizationIgnored == true
               ? ReadinessStatus.ready
-              : ReadinessStatus.warning,
-          actionLabel: 'Allow',
+              : batteryOptimizationIgnored == false
+              ? ReadinessStatus.warning
+              : ReadinessStatus.unknown,
+          actionLabel: batteryOptimizationIgnored == null ? 'Refresh' : 'Allow',
         ),
       ],
     );

@@ -1,8 +1,11 @@
 package com.example.folder_sync
 
 import android.content.Intent
+import android.net.Uri
 import android.net.wifi.WifiManager
 import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -66,6 +69,23 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            BATTERY_OPTIMIZATION_CHANNEL
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "isIgnoringBatteryOptimizations" -> {
+                    result.success(isIgnoringBatteryOptimizations())
+                }
+
+                "requestIgnoreBatteryOptimizations" -> {
+                    result.success(requestIgnoreBatteryOptimizations())
+                }
+
+                else -> result.notImplemented()
+            }
+        }
     }
 
     private fun startBackupForegroundService(title: String, message: String): Boolean {
@@ -109,11 +129,51 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    private fun isIgnoringBatteryOptimizations(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            return true
+        }
+
+        return try {
+            val powerManager = getSystemService(POWER_SERVICE) as PowerManager
+            powerManager.isIgnoringBatteryOptimizations(packageName)
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun requestIgnoreBatteryOptimizations(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            return true
+        }
+
+        if (isIgnoringBatteryOptimizations()) {
+            return true
+        }
+
+        return try {
+            val requestIntent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = Uri.parse("package:$packageName")
+            }
+            startActivity(requestIntent)
+            true
+        } catch (_: Exception) {
+            try {
+                startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                true
+            } catch (_: Exception) {
+                false
+            }
+        }
+    }
+
     companion object {
         private const val BACKUP_FOREGROUND_SERVICE_CHANNEL =
             "openbackup/backup_foreground_service"
         private const val WIFI_STATUS_CHANNEL = "openbackup/wifi_status"
         private const val BACKGROUND_SCHEDULER_CHANNEL =
             "openbackup/background_scheduler"
+        private const val BATTERY_OPTIMIZATION_CHANNEL =
+            "openbackup/battery_optimization"
     }
 }
