@@ -25,22 +25,27 @@ class FtpServerNotifier extends StateNotifier<List<FtpServerModel>> {
     state = _repository.getAll().toList();
   }
 
-  void addServer(FtpServerModel server) {
+  Future<void> loadServers() async {
+    await _repository.load();
+    refresh();
+  }
+
+  Future<void> addServer(FtpServerModel server) async {
     _repository.add(server);
     refresh();
   }
 
-  void deleteServer(String id) {
+  Future<void> deleteServer(String id) async {
     _repository.remove(id);
     refresh();
   }
 
-  void updateServer(FtpServerModel server) {
+  Future<void> updateServer(FtpServerModel server) async {
     _repository.update(server);
     refresh();
   }
 
-  void clearServers() {
+  Future<void> clearServers() async {
     _repository.clear();
     refresh();
   }
@@ -55,3 +60,7 @@ final ftpServerProvider =
       final repository = ref.watch(ftpRepositoryProvider);
       return FtpServerNotifier(repository);
     });
+
+final ftpServerLoadProvider = FutureProvider<void>((ref) async {
+  await ref.read(ftpServerProvider.notifier).loadServers();
+});

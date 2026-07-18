@@ -31,8 +31,11 @@ class BackupJobListScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final backupLoadState = ref.watch(backupJobLoadProvider);
+    final ftpLoadState = ref.watch(ftpServerLoadProvider);
     final jobs = ref.watch(backupJobProvider);
     final ftpServers = ref.watch(ftpServerProvider);
+    final isLoading = backupLoadState.isLoading || ftpLoadState.isLoading;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -42,7 +45,9 @@ class BackupJobListScreen extends ConsumerWidget {
         onPressed: () => _openForm(context),
         child: const Icon(AppIcons.add),
       ),
-      body: jobs.isEmpty
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : jobs.isEmpty
           ? _EmptyBackupJobs(hasFtpServers: ftpServers.isNotEmpty)
           : ListView.separated(
               padding: const EdgeInsets.all(AppSizes.paddingM),
@@ -192,7 +197,7 @@ class _BackupJobTile extends ConsumerWidget {
     );
 
     if (shouldDelete == true) {
-      ref.read(backupJobProvider.notifier).deleteJob(job.id);
+      await ref.read(backupJobProvider.notifier).deleteJob(job.id);
     }
   }
 

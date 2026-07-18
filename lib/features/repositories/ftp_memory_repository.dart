@@ -1,6 +1,10 @@
+import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:ftpconnect/ftpconnect.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../ftp/models/ftp_server_model.dart';
 
@@ -19,21 +23,56 @@ class FtpMemoryRepository {
   static final FtpMemoryRepository instance = FtpMemoryRepository._();
 
   final List<FtpServerModel> _servers = [];
+  bool _loaded = false;
 
   /// Returns all FTP servers.
   UnmodifiableListView<FtpServerModel> getAll() {
     return UnmodifiableListView(_servers);
   }
 
+  /// Loads saved FTP servers from local storage.
+  Future<void> load() async {
+    if (_loaded) {
+      return;
+    }
+
+    _loaded = true;
+
+    try {
+      final file = await _storageFile();
+      if (!await file.exists()) {
+        return;
+      }
+
+      final decoded = jsonDecode(await file.readAsString());
+      if (decoded is! List) {
+        return;
+      }
+
+      _servers
+        ..clear()
+        ..addAll(
+          decoded
+              .whereType<Map<String, dynamic>>()
+              .map(FtpServerModel.fromJson)
+              .where((server) => server.id.isNotEmpty),
+        );
+    } catch (_) {
+      return;
+    }
+  }
+
   /// Adds a new FTP server.
   void add(FtpServerModel server) {
     _servers.add(server);
+    unawaited(_save());
   }
 
   /// Removes a server by id.
   bool remove(String id) {
     final exists = _servers.any((e) => e.id == id);
     _servers.removeWhere((e) => e.id == id);
+    unawaited(_save());
     return exists;
   }
 
@@ -46,6 +85,7 @@ class FtpMemoryRepository {
     }
 
     _servers[index] = server;
+    unawaited(_save());
     return true;
   }
 
@@ -61,6 +101,7 @@ class FtpMemoryRepository {
   /// Removes all servers.
   void clear() {
     _servers.clear();
+    unawaited(_save());
   }
 
   /// Number of configured servers.
@@ -102,6 +143,28 @@ class FtpMemoryRepository {
       if (connected) {
         await ftpConnect.disconnect();
       }
+    }
+  }
+
+  Future<File> _storageFile() async {
+    final directory = await getApplicationDocumentsDirectory();
+    final storageDirectory = Directory('${directory.path}/openbackup');
+    if (!await storageDirectory.exists()) {
+      await storageDirectory.create(recursive: true);
+    }
+
+    return File('${storageDirectory.path}/ftp_servers.json');
+  }
+
+  Future<void> _save() async {
+    try {
+      final file = await _storageFile().timeout(const Duration(seconds: 1));
+      final encoded = jsonEncode(
+        _servers.map((server) => server.toJson()).toList(),
+      );
+      await file.writeAsString(encoded);
+    } catch (_) {
+      return;
     }
   }
 }

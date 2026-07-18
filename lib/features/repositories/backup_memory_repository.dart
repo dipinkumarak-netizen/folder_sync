@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:ftpconnect/ftpconnect.dart';
 import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
 
 import '../backup/models/backup_job_model.dart';
 import '../ftp/models/ftp_server_model.dart';
@@ -36,13 +39,46 @@ class BackupMemoryRepository {
   static final BackupMemoryRepository instance = BackupMemoryRepository._();
 
   final List<BackupJobModel> _jobs = [];
+  bool _loaded = false;
 
   UnmodifiableListView<BackupJobModel> getAll() {
     return UnmodifiableListView(_jobs);
   }
 
+  Future<void> load() async {
+    if (_loaded) {
+      return;
+    }
+
+    _loaded = true;
+
+    try {
+      final file = await _storageFile();
+      if (!await file.exists()) {
+        return;
+      }
+
+      final decoded = jsonDecode(await file.readAsString());
+      if (decoded is! List) {
+        return;
+      }
+
+      _jobs
+        ..clear()
+        ..addAll(
+          decoded
+              .whereType<Map<String, dynamic>>()
+              .map(BackupJobModel.fromJson)
+              .where((job) => job.id.isNotEmpty),
+        );
+    } catch (_) {
+      return;
+    }
+  }
+
   void add(BackupJobModel job) {
     _jobs.add(job);
+    unawaited(_save());
   }
 
   bool update(BackupJobModel job) {
@@ -52,12 +88,14 @@ class BackupMemoryRepository {
     }
 
     _jobs[index] = job;
+    unawaited(_save());
     return true;
   }
 
   bool remove(String id) {
     final exists = _jobs.any((e) => e.id == id);
     _jobs.removeWhere((e) => e.id == id);
+    unawaited(_save());
     return exists;
   }
 
@@ -251,6 +289,26 @@ class BackupMemoryRepository {
           throw StateError('Could not open remote folder $part.');
         }
       }
+    }
+  }
+
+  Future<File> _storageFile() async {
+    final directory = await getApplicationDocumentsDirectory();
+    final storageDirectory = Directory('${directory.path}/openbackup');
+    if (!await storageDirectory.exists()) {
+      await storageDirectory.create(recursive: true);
+    }
+
+    return File('${storageDirectory.path}/backup_jobs.json');
+  }
+
+  Future<void> _save() async {
+    try {
+      final file = await _storageFile().timeout(const Duration(seconds: 1));
+      final encoded = jsonEncode(_jobs.map((job) => job.toJson()).toList());
+      await file.writeAsString(encoded);
+    } catch (_) {
+      return;
     }
   }
 }

@@ -96,7 +96,7 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
     );
   }
 
-  void _saveServer() {
+  Future<void> _saveServer() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -104,9 +104,13 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
     final server = _buildServerFromForm();
     final notifier = ref.read(ftpServerProvider.notifier);
     if (_isEditing) {
-      notifier.updateServer(server);
+      await notifier.updateServer(server);
     } else {
-      notifier.addServer(server);
+      await notifier.addServer(server);
+    }
+
+    if (!mounted) {
+      return;
     }
 
     Navigator.pop(context);

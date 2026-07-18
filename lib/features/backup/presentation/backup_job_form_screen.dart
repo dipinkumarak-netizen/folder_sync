@@ -87,7 +87,7 @@ class _BackupJobFormScreenState extends ConsumerState<BackupJobFormScreen> {
     _localFolderController.text = path;
   }
 
-  void _saveJob() {
+  Future<void> _saveJob() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -112,9 +112,13 @@ class _BackupJobFormScreenState extends ConsumerState<BackupJobFormScreen> {
 
     final notifier = ref.read(backupJobProvider.notifier);
     if (_isEditing) {
-      notifier.updateJob(job);
+      await notifier.updateJob(job);
     } else {
-      notifier.addJob(job);
+      await notifier.addJob(job);
+    }
+
+    if (!mounted) {
+      return;
     }
 
     Navigator.pop(context);
@@ -122,6 +126,7 @@ class _BackupJobFormScreenState extends ConsumerState<BackupJobFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final ftpServerLoadState = ref.watch(ftpServerLoadProvider);
     final ftpServers = ref.watch(ftpServerProvider);
     if (_selectedFtpServerId == null && ftpServers.length == 1) {
       _selectedFtpServerId = ftpServers.first.id;
@@ -160,24 +165,34 @@ class _BackupJobFormScreenState extends ConsumerState<BackupJobFormScreen> {
                     value == null || value.trim().isEmpty ? 'Required' : null,
               ),
               const SizedBox(height: AppSizes.paddingM),
-              DropdownButtonFormField<String>(
-                initialValue: _selectedFtpServerId,
-                decoration: _inputDecoration('FTP Server', AppIcons.server),
-                items: ftpServers.map((server) {
-                  return DropdownMenuItem<String>(
-                    value: server.id,
-                    child: Text(_serverLabel(server)),
-                  );
-                }).toList(),
-                onChanged: ftpServers.isEmpty
-                    ? null
-                    : (value) {
-                        setState(() {
-                          _selectedFtpServerId = value;
-                        });
-                      },
-                validator: (value) =>
-                    value == null ? 'Add or select an FTP server' : null,
+              ftpServerLoadState.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (_, _) => _FtpServerDropdown(
+                  selectedFtpServerId: _selectedFtpServerId,
+                  ftpServers: ftpServers,
+                  inputDecoration: _inputDecoration(
+                    'FTP Server',
+                    AppIcons.server,
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedFtpServerId = value;
+                    });
+                  },
+                ),
+                data: (_) => _FtpServerDropdown(
+                  selectedFtpServerId: _selectedFtpServerId,
+                  ftpServers: ftpServers,
+                  inputDecoration: _inputDecoration(
+                    'FTP Server',
+                    AppIcons.server,
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedFtpServerId = value;
+                    });
+                  },
+                ),
               ),
               const SizedBox(height: AppSizes.paddingM),
               TextFormField(
@@ -209,8 +224,35 @@ class _BackupJobFormScreenState extends ConsumerState<BackupJobFormScreen> {
       ),
     );
   }
+}
 
-  String _serverLabel(FtpServerModel server) {
-    return '${server.name} (${server.host}:${server.port})';
+class _FtpServerDropdown extends StatelessWidget {
+  const _FtpServerDropdown({
+    required this.selectedFtpServerId,
+    required this.ftpServers,
+    required this.inputDecoration,
+    required this.onChanged,
+  });
+
+  final String? selectedFtpServerId;
+  final List<FtpServerModel> ftpServers;
+  final InputDecoration inputDecoration;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<String>(
+      initialValue: selectedFtpServerId,
+      decoration: inputDecoration,
+      items: ftpServers.map((server) {
+        return DropdownMenuItem<String>(
+          value: server.id,
+          child: Text('${server.name} (${server.host}:${server.port})'),
+        );
+      }).toList(),
+      onChanged: ftpServers.isEmpty ? null : onChanged,
+      validator: (value) =>
+          value == null ? 'Add or select an FTP server' : null,
+    );
   }
 }

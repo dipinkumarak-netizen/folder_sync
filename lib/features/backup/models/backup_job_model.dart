@@ -71,4 +71,51 @@ class BackupJobModel {
           List.unmodifiable(this.backedUpRelativePaths),
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'localFolderPath': localFolderPath,
+      'ftpServerId': ftpServerId,
+      'remoteFolderPath': remoteFolderPath,
+      'enabled': enabled,
+      'status': status.name,
+      'lastRunAt': lastRunAt?.toIso8601String(),
+      'lastMessage': lastMessage,
+      'lastFilesBackedUp': lastFilesBackedUp,
+      'totalFilesBackedUp': totalFilesBackedUp,
+      'totalBytesBackedUp': totalBytesBackedUp,
+      'backedUpRelativePaths': backedUpRelativePaths,
+    };
+  }
+
+  factory BackupJobModel.fromJson(Map<String, dynamic> json) {
+    final status = BackupJobStatus.values.firstWhere(
+      (value) => value.name == json['status'],
+      orElse: () => BackupJobStatus.idle,
+    );
+    final lastRunAtValue = json['lastRunAt'] as String?;
+
+    return BackupJobModel(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      localFolderPath: json['localFolderPath'] as String? ?? '',
+      ftpServerId: json['ftpServerId'] as String? ?? '',
+      remoteFolderPath: json['remoteFolderPath'] as String? ?? '/',
+      enabled: json['enabled'] as bool? ?? true,
+      status: status == BackupJobStatus.running ? BackupJobStatus.idle : status,
+      lastRunAt: lastRunAtValue == null
+          ? null
+          : DateTime.tryParse(lastRunAtValue),
+      lastMessage: json['lastMessage'] as String? ?? 'Not run yet',
+      lastFilesBackedUp: json['lastFilesBackedUp'] as int? ?? 0,
+      totalFilesBackedUp: json['totalFilesBackedUp'] as int? ?? 0,
+      totalBytesBackedUp: json['totalBytesBackedUp'] as int? ?? 0,
+      backedUpRelativePaths:
+          (json['backedUpRelativePaths'] as List<dynamic>? ?? const [])
+              .whereType<String>()
+              .toList(),
+    );
+  }
 }

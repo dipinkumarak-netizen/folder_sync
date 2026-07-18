@@ -68,15 +68,15 @@ class FtpServerModel {
 
   factory FtpServerModel.fromJson(Map<String, dynamic> json) {
     return FtpServerModel(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      host: json['host'] as String,
-      port: json['port'] as int,
-      username: json['username'] as String,
-      password: json['password'] as String,
-      remotePath: json['remotePath'] as String,
-      isAnonymous: json['isAnonymous'] ?? false,
-      isFavorite: json['isFavorite'] ?? false,
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      host: json['host'] as String? ?? '',
+      port: json['port'] as int? ?? 21,
+      username: json['username'] as String? ?? '',
+      password: json['password'] as String? ?? '',
+      remotePath: json['remotePath'] as String? ?? '/',
+      isAnonymous: json['isAnonymous'] as bool? ?? false,
+      isFavorite: json['isFavorite'] as bool? ?? false,
     );
   }
 }

@@ -24,22 +24,27 @@ class BackupJobNotifier extends StateNotifier<List<BackupJobModel>> {
     state = _repository.getAll().toList();
   }
 
-  void addJob(BackupJobModel job) {
+  Future<void> loadJobs() async {
+    await _repository.load();
+    refresh();
+  }
+
+  Future<void> addJob(BackupJobModel job) async {
     _repository.add(job);
     refresh();
   }
 
-  void updateJob(BackupJobModel job) {
+  Future<void> updateJob(BackupJobModel job) async {
     _repository.update(job);
     refresh();
   }
 
-  void deleteJob(String id) {
+  Future<void> deleteJob(String id) async {
     _repository.remove(id);
     refresh();
   }
 
-  void toggleJob(String id, bool enabled) {
+  Future<void> toggleJob(String id, bool enabled) async {
     final job = _repository.findById(id);
     if (job == null) {
       return;
@@ -87,3 +92,7 @@ final backupJobProvider =
       final repository = ref.watch(backupRepositoryProvider);
       return BackupJobNotifier(repository);
     });
+
+final backupJobLoadProvider = FutureProvider<void>((ref) async {
+  await ref.read(backupJobProvider.notifier).loadJobs();
+});
