@@ -23,6 +23,19 @@ void main() {
     expect(find.text('System Status'), findsOneWidget);
     expect(find.text('Configure FTP connections'), findsOneWidget);
     expect(find.text('Create and manage backup jobs'), findsOneWidget);
+    expect(find.text('Mirror and two-way sync'), findsOneWidget);
+
+    await tester.tap(find.text('Mirror and two-way sync'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('No Sync Rules'), findsOneWidget);
+    expect(
+      find.text('Add an FTP server first, then create a sync rule.'),
+      findsOneWidget,
+    );
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('Create and manage backup jobs'));
     await tester.pumpAndSettle();

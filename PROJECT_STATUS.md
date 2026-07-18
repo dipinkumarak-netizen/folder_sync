@@ -70,6 +70,17 @@ File Picker
 - Android Data Sync Foreground Service Skeleton
 - Dart Backup Runner Foreground Service Handoff
 
+## Synchronization Module
+
+- Sync Rule List Screen
+- Sync Rule Form Screen
+- Direction Rules
+- Conflict Rules
+- Delete Rules
+- File Filter Rules
+- Wi-Fi Only and Home Wi-Fi Rules
+- Local Sync Rule Persistence
+
 ---
 
 # Current Version
@@ -140,6 +151,18 @@ Pending:
 Milestone 4
 
 Synchronization
+
+- Rule Management
+- Upload / Download / Two-Way / Mirror Modes
+- Conflict Handling Rules
+- Delete Handling Rules
+- Wi-Fi Only Rules
+
+Pending:
+
+- Manual Sync Runner
+- Remote File Diffing
+- Foreground Sync Progress
 
 Milestone 5
 
