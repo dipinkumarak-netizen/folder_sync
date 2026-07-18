@@ -7,6 +7,7 @@ import '../../../core/constants/app_strings.dart';
 import '../../backup/presentation/backup_job_list_screen.dart';
 import '../../ftp/presentation/ftp_server_list_screen.dart';
 import '../../history/presentation/history_screen.dart';
+import '../../restore/presentation/restore_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
 import '../../sync/presentation/sync_rule_list_screen.dart';
 import '../widgets/dashboard_card.dart';
@@ -81,7 +82,12 @@ class HomeScreen extends StatelessWidget {
             iconColor: Colors.purple,
             title: 'Restore',
             subtitle: 'Restore files from backup',
-            onTap: () {},
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const RestoreScreen()),
+              );
+            },
           ),
 
           const SizedBox(height: AppSizes.paddingM),

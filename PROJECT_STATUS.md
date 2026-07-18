@@ -90,6 +90,15 @@ File Picker
 - Confirmed Delete Rule Execution
 - Foreground Sync Progress
 
+## Restore Module
+
+- Restore Screen
+- FTP Restore Preview
+- Manual FTP Restore Runner
+- Existing Local File Skip Protection
+- Foreground Restore Progress
+- Restore History Logging
+
 ## Scheduler Module
 
 - In-App Sync Scheduler Foundation
@@ -210,13 +219,17 @@ Scheduler
 - Scheduled Backup Jobs
 - Sync Rule Trigger Evaluation
 
-Pending:
+Completed:
 
 - Restore Module Foundation
 
 Milestone 6
 
 Restore
+
+- FTP Restore Preview
+- Manual FTP Restore Runner
+- Restore History Logging
 
 Milestone 7
 
