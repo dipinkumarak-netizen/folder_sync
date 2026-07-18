@@ -1,14 +1,33 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme/app_theme.dart';
 import 'features/scheduler/providers/scheduler_provider.dart';
+import 'features/scheduler/services/headless_scheduled_sync_runner.dart';
+import 'features/scheduler/services/headless_scheduler_bridge.dart';
 import 'screens/splash/splash_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
   runApp(const FtpBackupApp());
+}
+
+@pragma('vm:entry-point')
+Future<void> scheduledSyncMain() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  DartPluginRegistrant.ensureInitialized();
+
+  try {
+    final result = await HeadlessScheduledSyncRunner().runDueSyncRules();
+    await HeadlessSchedulerBridge.complete(message: result.message);
+  } catch (_) {
+    await HeadlessSchedulerBridge.complete(
+      message: 'Scheduled sync failed unexpectedly.',
+    );
+  }
 }
 
 class FtpBackupApp extends StatelessWidget {

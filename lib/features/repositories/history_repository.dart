@@ -69,6 +69,10 @@ class HistoryRepository {
     unawaited(_save());
   }
 
+  Future<void> flush() {
+    return _save();
+  }
+
   void _sortNewestFirst() {
     _entries.sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }

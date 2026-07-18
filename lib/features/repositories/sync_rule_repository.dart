@@ -153,6 +153,10 @@ class SyncRuleRepository {
     }
   }
 
+  Future<void> flush() {
+    return _save();
+  }
+
   Future<SyncRunResult> runSync({
     required SyncRuleModel rule,
     required FtpServerModel ftpServer,
