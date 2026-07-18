@@ -80,6 +80,10 @@ File Picker
 - File Filter Rules
 - Wi-Fi Only and Home Wi-Fi Rules
 - Local Sync Rule Persistence
+- Manual Sync Runner
+- Sync History Logging
+- Wi-Fi Only Sync Enforcement
+- Home Wi-Fi Name Check Foundation
 
 ## History Module
 
@@ -169,9 +173,10 @@ Synchronization
 
 Pending:
 
-- Manual Sync Runner
 - Remote File Diffing
 - Foreground Sync Progress
+- Protected Delete Preview
+- Destructive Mirror Delete Execution
 
 Milestone 5
 

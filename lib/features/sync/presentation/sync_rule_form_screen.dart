@@ -142,8 +142,12 @@ class _SyncRuleFormScreenState extends ConsumerState<SyncRuleFormScreen> {
       maxFileSizeMb: maxFileSizeText.isEmpty
           ? null
           : int.parse(maxFileSizeText),
+      status: existingRule?.status ?? SyncRuleStatus.idle,
       lastRunAt: existingRule?.lastRunAt,
       lastMessage: existingRule?.lastMessage ?? 'Not run yet',
+      lastFilesChanged: existingRule?.lastFilesChanged ?? 0,
+      totalFilesChanged: existingRule?.totalFilesChanged ?? 0,
+      totalBytesChanged: existingRule?.totalBytesChanged ?? 0,
     );
 
     final notifier = ref.read(syncRuleProvider.notifier);

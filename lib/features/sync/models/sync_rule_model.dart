@@ -24,6 +24,8 @@ enum SyncDeleteRule {
 
 enum SyncTriggerRule { manualOnly, onHomeWifi, hourly, daily }
 
+enum SyncRuleStatus { idle, running, success, failed }
+
 class SyncRuleModel {
   final String id;
   final String name;
@@ -42,8 +44,12 @@ class SyncRuleModel {
   final String includePatterns;
   final String excludePatterns;
   final int? maxFileSizeMb;
+  final SyncRuleStatus status;
   final DateTime? lastRunAt;
   final String lastMessage;
+  final int lastFilesChanged;
+  final int totalFilesChanged;
+  final int totalBytesChanged;
 
   const SyncRuleModel({
     required this.id,
@@ -63,8 +69,12 @@ class SyncRuleModel {
     this.includePatterns = '*',
     this.excludePatterns = '',
     this.maxFileSizeMb,
+    this.status = SyncRuleStatus.idle,
     this.lastRunAt,
     this.lastMessage = 'Not run yet',
+    this.lastFilesChanged = 0,
+    this.totalFilesChanged = 0,
+    this.totalBytesChanged = 0,
   });
 
   SyncRuleModel copyWith({
@@ -86,8 +96,12 @@ class SyncRuleModel {
     String? excludePatterns,
     int? maxFileSizeMb,
     bool clearMaxFileSize = false,
+    SyncRuleStatus? status,
     DateTime? lastRunAt,
     String? lastMessage,
+    int? lastFilesChanged,
+    int? totalFilesChanged,
+    int? totalBytesChanged,
   }) {
     return SyncRuleModel(
       id: id ?? this.id,
@@ -109,8 +123,12 @@ class SyncRuleModel {
       maxFileSizeMb: clearMaxFileSize
           ? null
           : maxFileSizeMb ?? this.maxFileSizeMb,
+      status: status ?? this.status,
       lastRunAt: lastRunAt ?? this.lastRunAt,
       lastMessage: lastMessage ?? this.lastMessage,
+      lastFilesChanged: lastFilesChanged ?? this.lastFilesChanged,
+      totalFilesChanged: totalFilesChanged ?? this.totalFilesChanged,
+      totalBytesChanged: totalBytesChanged ?? this.totalBytesChanged,
     );
   }
 
@@ -133,12 +151,22 @@ class SyncRuleModel {
       'includePatterns': includePatterns,
       'excludePatterns': excludePatterns,
       'maxFileSizeMb': maxFileSizeMb,
+      'status': status.name,
       'lastRunAt': lastRunAt?.toIso8601String(),
       'lastMessage': lastMessage,
+      'lastFilesChanged': lastFilesChanged,
+      'totalFilesChanged': totalFilesChanged,
+      'totalBytesChanged': totalBytesChanged,
     };
   }
 
   factory SyncRuleModel.fromJson(Map<String, dynamic> json) {
+    final status = _enumValue(
+      SyncRuleStatus.values,
+      json['status'],
+      SyncRuleStatus.idle,
+    );
+
     return SyncRuleModel(
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
@@ -173,8 +201,12 @@ class SyncRuleModel {
       includePatterns: json['includePatterns'] as String? ?? '*',
       excludePatterns: json['excludePatterns'] as String? ?? '',
       maxFileSizeMb: json['maxFileSizeMb'] as int?,
+      status: status == SyncRuleStatus.running ? SyncRuleStatus.idle : status,
       lastRunAt: DateTime.tryParse(json['lastRunAt'] as String? ?? ''),
       lastMessage: json['lastMessage'] as String? ?? 'Not run yet',
+      lastFilesChanged: json['lastFilesChanged'] as int? ?? 0,
+      totalFilesChanged: json['totalFilesChanged'] as int? ?? 0,
+      totalBytesChanged: json['totalBytesChanged'] as int? ?? 0,
     );
   }
 

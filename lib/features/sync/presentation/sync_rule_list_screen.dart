@@ -222,6 +222,8 @@ class _SyncRuleTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final directionColor = _directionColor(rule.direction);
+    final isRunning = rule.status == SyncRuleStatus.running;
+    final statusColor = _statusColor(rule.status);
 
     return OBCard(
       onTap: onEdit,
@@ -256,11 +258,13 @@ class _SyncRuleTile extends ConsumerWidget {
               ),
               Switch(
                 value: rule.enabled,
-                onChanged: (value) {
-                  ref
-                      .read(syncRuleProvider.notifier)
-                      .toggleRule(rule.id, value);
-                },
+                onChanged: isRunning
+                    ? null
+                    : (value) {
+                        ref
+                            .read(syncRuleProvider.notifier)
+                            .toggleRule(rule.id, value);
+                      },
               ),
             ],
           ),
@@ -289,6 +293,11 @@ class _SyncRuleTile extends ConsumerWidget {
                 label: _triggerLabel(rule.triggerRule),
                 color: AppColors.schedule,
               ),
+              _RuleBadge(label: _statusLabel(rule.status), color: statusColor),
+              _RuleBadge(
+                label: '${rule.totalFilesChanged} file(s)',
+                color: AppColors.info,
+              ),
               if (rule.runOnWifiOnly)
                 const _RuleBadge(label: 'Wi-Fi Only', color: AppColors.success),
               if (rule.homeWifiName.isNotEmpty)
@@ -302,28 +311,67 @@ class _SyncRuleTile extends ConsumerWidget {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: null,
-                  icon: const Icon(AppIcons.sync),
-                  label: const Text('Run Sync'),
+                  onPressed: isRunning ? null : () => _runSync(context, ref),
+                  icon: isRunning
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(AppIcons.sync),
+                  label: Text(isRunning ? 'Running' : 'Run Sync'),
                 ),
               ),
               const SizedBox(width: AppSizes.paddingS),
               IconButton(
                 tooltip: 'Edit Sync Rule',
                 icon: const Icon(AppIcons.edit),
-                onPressed: onEdit,
+                onPressed: isRunning ? null : onEdit,
               ),
               IconButton(
                 tooltip: 'Delete Sync Rule',
                 icon: const Icon(AppIcons.delete),
                 color: AppColors.error,
-                onPressed: () => _confirmDelete(context, ref),
+                onPressed: isRunning
+                    ? null
+                    : () => _confirmDelete(context, ref),
               ),
             ],
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _runSync(BuildContext context, WidgetRef ref) async {
+    final server = ftpServer;
+    if (server == null) {
+      _showMessage(
+        context,
+        'The selected FTP server is not available.',
+        AppColors.error,
+      );
+      return;
+    }
+
+    final result = await ref
+        .read(syncRuleProvider.notifier)
+        .runRule(rule: rule, ftpServer: server);
+
+    if (!context.mounted) {
+      return;
+    }
+
+    _showMessage(
+      context,
+      result.message,
+      result.success ? AppColors.success : AppColors.error,
+    );
+  }
+
+  void _showMessage(BuildContext context, String message, Color color) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message), backgroundColor: color));
   }
 
   Color _directionColor(SyncDirection direction) {
@@ -371,6 +419,24 @@ class _SyncRuleTile extends ConsumerWidget {
       SyncTriggerRule.onHomeWifi => 'Home Wi-Fi',
       SyncTriggerRule.hourly => 'Hourly',
       SyncTriggerRule.daily => 'Daily',
+    };
+  }
+
+  Color _statusColor(SyncRuleStatus status) {
+    return switch (status) {
+      SyncRuleStatus.idle => AppColors.textHint,
+      SyncRuleStatus.running => AppColors.info,
+      SyncRuleStatus.success => AppColors.success,
+      SyncRuleStatus.failed => AppColors.error,
+    };
+  }
+
+  String _statusLabel(SyncRuleStatus status) {
+    return switch (status) {
+      SyncRuleStatus.idle => 'Idle',
+      SyncRuleStatus.running => 'Running',
+      SyncRuleStatus.success => 'Success',
+      SyncRuleStatus.failed => 'Failed',
     };
   }
 }

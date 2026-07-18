@@ -1,9 +1,10 @@
 package com.example.folder_sync
 
 import android.content.Intent
+import android.net.wifi.WifiManager
 import android.os.Build
-import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
@@ -24,6 +25,16 @@ class MainActivity : FlutterActivity() {
                     result.success(null)
                 }
 
+                else -> result.notImplemented()
+            }
+        }
+
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            WIFI_STATUS_CHANNEL
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "currentSsid" -> result.success(currentWifiSsid())
                 else -> result.notImplemented()
             }
         }
@@ -54,8 +65,22 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    private fun currentWifiSsid(): String? {
+        return try {
+            val wifiManager = applicationContext.getSystemService(WIFI_SERVICE) as WifiManager
+            val rawSsid = wifiManager.connectionInfo?.ssid ?: return null
+            rawSsid
+                .trim()
+                .removeSurrounding("\"")
+                .takeIf { it.isNotBlank() && it != "<unknown ssid>" }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     companion object {
         private const val BACKUP_FOREGROUND_SERVICE_CHANNEL =
             "openbackup/backup_foreground_service"
+        private const val WIFI_STATUS_CHANNEL = "openbackup/wifi_status"
     }
 }
