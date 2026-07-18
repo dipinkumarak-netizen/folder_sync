@@ -10,12 +10,14 @@ class AppSettingsModel {
   final bool defaultBackupWifiOnly;
   final bool defaultSyncWifiOnly;
   final bool showForegroundNotifications;
+  final bool onboardingCompleted;
 
   const AppSettingsModel({
     this.automaticSchedulingEnabled = true,
     this.defaultBackupWifiOnly = true,
     this.defaultSyncWifiOnly = true,
     this.showForegroundNotifications = true,
+    this.onboardingCompleted = false,
   });
 
   AppSettingsModel copyWith({
@@ -23,6 +25,7 @@ class AppSettingsModel {
     bool? defaultBackupWifiOnly,
     bool? defaultSyncWifiOnly,
     bool? showForegroundNotifications,
+    bool? onboardingCompleted,
   }) {
     return AppSettingsModel(
       automaticSchedulingEnabled:
@@ -32,6 +35,7 @@ class AppSettingsModel {
       defaultSyncWifiOnly: defaultSyncWifiOnly ?? this.defaultSyncWifiOnly,
       showForegroundNotifications:
           showForegroundNotifications ?? this.showForegroundNotifications,
+      onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
     );
   }
 
@@ -41,6 +45,7 @@ class AppSettingsModel {
       'defaultBackupWifiOnly': defaultBackupWifiOnly,
       'defaultSyncWifiOnly': defaultSyncWifiOnly,
       'showForegroundNotifications': showForegroundNotifications,
+      'onboardingCompleted': onboardingCompleted,
     };
   }
 
@@ -52,6 +57,7 @@ class AppSettingsModel {
       defaultSyncWifiOnly: json['defaultSyncWifiOnly'] as bool? ?? true,
       showForegroundNotifications:
           json['showForegroundNotifications'] as bool? ?? true,
+      onboardingCompleted: json['onboardingCompleted'] as bool? ?? false,
     );
   }
 }

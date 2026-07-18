@@ -1,10 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
 import '../../features/dashboard/presentation/home_screen.dart';
+import '../../features/settings/presentation/onboarding_readiness_screen.dart';
+import '../../features/settings/providers/app_settings_provider.dart';
 
 /// ===============================================================
 /// OpenBackup
@@ -14,30 +17,34 @@ import '../../features/dashboard/presentation/home_screen.dart';
 /// Description : Splash screen.
 /// ===============================================================
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   void initState() {
     super.initState();
     _navigateToHome();
   }
 
-  void _navigateToHome() {
-    Timer(const Duration(seconds: 2), () {
-      if (!mounted) return;
+  Future<void> _navigateToHome() async {
+    await Future<void>.delayed(const Duration(seconds: 2));
+    await ref.read(appSettingsProvider.notifier).loadSettings();
 
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => const HomeScreen(),
-        ),
-      );
-    });
+    if (!mounted) return;
+
+    final settings = ref.read(appSettingsProvider);
+    final nextScreen = settings.onboardingCompleted
+        ? const HomeScreen()
+        : const OnboardingReadinessScreen();
+
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => nextScreen));
   }
 
   @override

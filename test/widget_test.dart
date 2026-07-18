@@ -18,6 +18,16 @@ void main() {
     expect(find.text('Version 1.0.0'), findsOneWidget);
 
     await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+
+    expect(
+      find.text(
+        'Prepare storage, notifications, Wi-Fi checks, and scheduling before your first backup.',
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Skip for now'));
     await tester.pumpAndSettle();
 
     expect(find.text('System Status'), findsOneWidget);

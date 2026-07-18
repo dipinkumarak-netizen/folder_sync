@@ -119,6 +119,7 @@ File Picker
 
 - Settings Screen
 - Persistent App Settings
+- First-Run Readiness Flow
 - Automatic Scheduling Toggle
 - Backup and Sync Wi-Fi Defaults
 - Foreground Notification Toggle
