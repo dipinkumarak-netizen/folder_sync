@@ -123,14 +123,6 @@ class _HeaderSection extends StatelessWidget {
             AppStrings.appName,
             style: Theme.of(context).textTheme.headlineSmall,
           ),
-          const SizedBox(height: AppSizes.paddingS),
-          Text(
-            'Free • Open Source • Privacy First',
-            textAlign: TextAlign.center,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: AppColors.textHint),
-          ),
         ],
       ),
     );
