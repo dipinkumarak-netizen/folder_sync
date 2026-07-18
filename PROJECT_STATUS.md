@@ -123,6 +123,8 @@ File Picker
 - Backup and Sync Wi-Fi Defaults
 - Foreground Notification Toggle
 - Permission Shortcuts
+- Storage and Permission Readiness Screen
+- Android Readiness Checklist
 - Clear History Action
 
 ## History Module
@@ -263,6 +265,7 @@ Settings
 - Scheduling Settings
 - Network Defaults
 - Permission Shortcuts
+- Storage and Permission Readiness Screen
 - Local Data Actions
 
 Milestone 9

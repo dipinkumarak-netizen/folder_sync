@@ -11,6 +11,7 @@ import '../../history/providers/history_provider.dart';
 import '../../scheduler/providers/scheduler_provider.dart';
 import '../models/app_settings_model.dart';
 import '../providers/app_settings_provider.dart';
+import 'permission_readiness_screen.dart';
 
 /// ===============================================================
 /// OpenBackup
@@ -120,6 +121,21 @@ class _PermissionsSection extends ConsumerWidget {
             if (value) {
               await Permission.notification.request();
             }
+          },
+        ),
+        const Divider(height: AppSizes.paddingL),
+        _ActionSettingTile(
+          title: 'Readiness Check',
+          subtitle:
+              'Review storage, notification, Wi-Fi, and battery readiness.',
+          actionLabel: 'Open',
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const PermissionReadinessScreen(),
+              ),
+            );
           },
         ),
         const Divider(height: AppSizes.paddingL),
