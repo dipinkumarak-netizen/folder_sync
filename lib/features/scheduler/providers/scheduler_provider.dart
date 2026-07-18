@@ -7,6 +7,7 @@ import '../../ftp/providers/ftp_provider.dart';
 import '../../sync/models/sync_rule_model.dart';
 import '../../sync/providers/sync_rule_provider.dart';
 import '../../sync/services/wifi_status_service.dart';
+import '../services/android_background_scheduler_service.dart';
 
 /// ===============================================================
 /// OpenBackup
@@ -38,6 +39,7 @@ class SchedulerService {
     }
 
     await _loadRepositories();
+    await _configureAndroidBackgroundSchedule();
     unawaited(runDueSyncRules());
     _timer = Timer.periodic(_tickInterval, (_) {
       unawaited(runDueSyncRules());
@@ -52,6 +54,7 @@ class SchedulerService {
     _isTicking = true;
     try {
       await _loadRepositories();
+      await _configureAndroidBackgroundSchedule();
 
       final ftpServers = _ref.read(ftpServerProvider);
       final rules = _ref.read(syncRuleProvider);
@@ -105,6 +108,41 @@ class SchedulerService {
       SyncTriggerRule.daily => _isDue(rule.lastRunAt, const Duration(days: 1)),
       SyncTriggerRule.onHomeWifi => _isHomeWifiRuleDue(rule),
     };
+  }
+
+  Future<void> _configureAndroidBackgroundSchedule() async {
+    final rules = _ref.read(syncRuleProvider);
+    final hasAutomaticRules = rules.any(_isAutomaticRule);
+    if (!hasAutomaticRules) {
+      await AndroidBackgroundSchedulerService.cancel();
+      return;
+    }
+
+    await AndroidBackgroundSchedulerService.configure(
+      enabled: true,
+      intervalMinutes: _backgroundIntervalMinutes(rules),
+    );
+  }
+
+  bool _isAutomaticRule(SyncRuleModel rule) {
+    return rule.enabled && rule.triggerRule != SyncTriggerRule.manualOnly;
+  }
+
+  int _backgroundIntervalMinutes(List<SyncRuleModel> rules) {
+    final hasHomeWifiRules = rules.any(
+      (rule) =>
+          _isAutomaticRule(rule) &&
+          rule.triggerRule == SyncTriggerRule.onHomeWifi,
+    );
+    if (hasHomeWifiRules) {
+      return _homeWifiMinimumInterval.inMinutes;
+    }
+
+    final hasHourlyRules = rules.any(
+      (rule) =>
+          _isAutomaticRule(rule) && rule.triggerRule == SyncTriggerRule.hourly,
+    );
+    return hasHourlyRules ? 60 : const Duration(days: 1).inMinutes;
   }
 
   Future<bool> _isHomeWifiRuleDue(SyncRuleModel rule) async {

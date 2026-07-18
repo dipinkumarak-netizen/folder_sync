@@ -40,6 +40,32 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            BACKGROUND_SCHEDULER_CHANNEL
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "configure" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    val intervalMinutes = call.argument<Int>("intervalMinutes") ?: 60
+                    result.success(
+                        AndroidBackgroundScheduler.configure(
+                            this,
+                            enabled,
+                            intervalMinutes
+                        )
+                    )
+                }
+
+                "cancel" -> {
+                    AndroidBackgroundScheduler.cancel(this)
+                    result.success(null)
+                }
+
+                else -> result.notImplemented()
+            }
+        }
     }
 
     private fun startBackupForegroundService(title: String, message: String): Boolean {
@@ -87,5 +113,7 @@ class MainActivity : FlutterActivity() {
         private const val BACKUP_FOREGROUND_SERVICE_CHANNEL =
             "openbackup/backup_foreground_service"
         private const val WIFI_STATUS_CHANNEL = "openbackup/wifi_status"
+        private const val BACKGROUND_SCHEDULER_CHANNEL =
+            "openbackup/background_scheduler"
     }
 }

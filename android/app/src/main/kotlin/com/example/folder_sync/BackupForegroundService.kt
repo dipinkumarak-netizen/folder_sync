@@ -3,6 +3,7 @@ package com.example.folder_sync
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
@@ -57,6 +58,10 @@ class BackupForegroundService : Service() {
     }
 
     private fun buildNotification(title: String, message: String): Notification {
+        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+            ?: Intent(this, MainActivity::class.java)
+        val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        val contentIntent = PendingIntent.getActivity(this, 0, launchIntent, pendingFlags)
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, CHANNEL_ID)
         } else {
@@ -68,6 +73,7 @@ class BackupForegroundService : Service() {
             .setSmallIcon(applicationInfo.icon)
             .setContentTitle(title)
             .setContentText(message)
+            .setContentIntent(contentIntent)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .build()

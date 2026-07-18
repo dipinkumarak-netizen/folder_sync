@@ -91,6 +91,7 @@ File Picker
 ## Scheduler Module
 
 - In-App Sync Scheduler Foundation
+- Android Background Schedule Foundation
 - Hourly Sync Rule Trigger
 - Daily Sync Rule Trigger
 - Home Wi-Fi Sync Rule Trigger Foundation
@@ -190,11 +191,12 @@ Milestone 5
 Scheduler
 
 - In-App Sync Scheduler Foundation
+- Android AlarmManager Schedule Registration
 - Sync Rule Trigger Evaluation
 
 Pending:
 
-- Android Background Scheduler
+- Headless Dart Scheduled Runner
 - Scheduled Backup Jobs
 
 Milestone 6
