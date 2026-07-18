@@ -81,6 +81,15 @@ File Picker
 - Wi-Fi Only and Home Wi-Fi Rules
 - Local Sync Rule Persistence
 
+## History Module
+
+- History Entry Model
+- Local History Persistence
+- History Screen
+- Backup Run History Logging
+- History Filters
+- Clear History Action
+
 ---
 
 # Current Version
@@ -175,6 +184,15 @@ Restore
 Milestone 7
 
 History
+
+- Backup History
+- Sync History Foundation
+- Restore History Foundation
+
+Pending:
+
+- Sync Runner History Logging
+- Restore History Logging
 
 Milestone 8
 

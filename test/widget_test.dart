@@ -24,6 +24,21 @@ void main() {
     expect(find.text('Configure FTP connections'), findsOneWidget);
     expect(find.text('Create and manage backup jobs'), findsOneWidget);
     expect(find.text('Mirror and two-way sync'), findsOneWidget);
+    expect(find.text('Backup history and logs'), findsOneWidget);
+
+    await tester.tap(find.text('Backup history and logs'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('No History Yet'), findsOneWidget);
+    expect(
+      find.text(
+        'Completed backup, sync, and restore operations will appear here.',
+      ),
+      findsOneWidget,
+    );
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('Mirror and two-way sync'));
     await tester.pumpAndSettle();

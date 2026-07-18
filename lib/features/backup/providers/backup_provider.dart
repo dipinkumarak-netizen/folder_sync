@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../ftp/models/ftp_server_model.dart';
+import '../../history/models/history_entry_model.dart';
+import '../../history/providers/history_provider.dart';
 import '../../repositories/backup_memory_repository.dart';
 import '../models/backup_job_model.dart';
 import '../services/backup_foreground_service.dart';
@@ -17,9 +19,11 @@ final backupRepositoryProvider = Provider<BackupMemoryRepository>((ref) {
 });
 
 class BackupJobNotifier extends StateNotifier<List<BackupJobModel>> {
-  BackupJobNotifier(this._repository) : super(_repository.getAll().toList());
+  BackupJobNotifier(this._repository, this._historyNotifier)
+    : super(_repository.getAll().toList());
 
   final BackupMemoryRepository _repository;
+  final HistoryNotifier _historyNotifier;
 
   void refresh() {
     state = _repository.getAll().toList();
@@ -97,6 +101,23 @@ class BackupJobNotifier extends StateNotifier<List<BackupJobModel>> {
     );
 
     _repository.update(completedJob);
+    await _historyNotifier.addEntry(
+      HistoryEntryModel(
+        id: '${completedJob.id}-${DateTime.now().microsecondsSinceEpoch}',
+        operationType: HistoryOperationType.backup,
+        status: result.success
+            ? HistoryEntryStatus.success
+            : HistoryEntryStatus.failed,
+        title: completedJob.name,
+        message: result.message,
+        sourcePath: completedJob.localFolderPath,
+        targetPath: '${ftpServer.name}:${completedJob.remoteFolderPath}',
+        relatedId: completedJob.id,
+        createdAt: DateTime.now(),
+        filesChanged: result.filesBackedUp,
+        bytesChanged: result.bytesBackedUp,
+      ),
+    );
     refresh();
 
     return result;
@@ -106,7 +127,8 @@ class BackupJobNotifier extends StateNotifier<List<BackupJobModel>> {
 final backupJobProvider =
     StateNotifierProvider<BackupJobNotifier, List<BackupJobModel>>((ref) {
       final repository = ref.watch(backupRepositoryProvider);
-      return BackupJobNotifier(repository);
+      final historyNotifier = ref.watch(historyProvider.notifier);
+      return BackupJobNotifier(repository, historyNotifier);
     });
 
 final backupJobLoadProvider = FutureProvider<void>((ref) async {
