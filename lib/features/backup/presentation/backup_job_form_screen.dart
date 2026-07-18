@@ -33,9 +33,11 @@ class _BackupJobFormScreenState extends ConsumerState<BackupJobFormScreen> {
   final _nameController = TextEditingController();
   final _localFolderController = TextEditingController();
   final _remoteFolderController = TextEditingController(text: '/');
+  final _homeWifiController = TextEditingController();
 
   String? _selectedFtpServerId;
   bool _enabled = true;
+  bool _runOnWifiOnly = true;
   BackupScheduleRule _scheduleRule = BackupScheduleRule.manualOnly;
 
   bool get _isEditing => widget.job != null;
@@ -54,6 +56,8 @@ class _BackupJobFormScreenState extends ConsumerState<BackupJobFormScreen> {
     _remoteFolderController.text = job.remoteFolderPath;
     _selectedFtpServerId = job.ftpServerId;
     _enabled = job.enabled;
+    _runOnWifiOnly = job.runOnWifiOnly;
+    _homeWifiController.text = job.homeWifiName;
     _scheduleRule = job.scheduleRule;
   }
 
@@ -62,6 +66,7 @@ class _BackupJobFormScreenState extends ConsumerState<BackupJobFormScreen> {
     _nameController.dispose();
     _localFolderController.dispose();
     _remoteFolderController.dispose();
+    _homeWifiController.dispose();
     super.dispose();
   }
 
@@ -104,6 +109,8 @@ class _BackupJobFormScreenState extends ConsumerState<BackupJobFormScreen> {
       remoteFolderPath: remoteFolder.isEmpty ? '/' : remoteFolder,
       enabled: _enabled,
       scheduleRule: _scheduleRule,
+      runOnWifiOnly: _runOnWifiOnly,
+      homeWifiName: _homeWifiController.text.trim(),
       status: existingJob?.status ?? BackupJobStatus.idle,
       lastRunAt: existingJob?.lastRunAt,
       lastMessage: existingJob?.lastMessage ?? 'Not run yet',
@@ -202,6 +209,22 @@ class _BackupJobFormScreenState extends ConsumerState<BackupJobFormScreen> {
                     _scheduleRule = value;
                   });
                 },
+              ),
+              const SizedBox(height: AppSizes.paddingM),
+              SwitchListTile(
+                value: _runOnWifiOnly,
+                title: const Text('Run on Wi-Fi Only'),
+                subtitle: const Text('Mobile data will not run this backup.'),
+                onChanged: (value) {
+                  setState(() {
+                    _runOnWifiOnly = value;
+                  });
+                },
+              ),
+              const SizedBox(height: AppSizes.paddingM),
+              TextFormField(
+                controller: _homeWifiController,
+                decoration: _inputDecoration('Home Wi-Fi Name', AppIcons.wifi),
               ),
               const SizedBox(height: AppSizes.paddingM),
               SwitchListTile(

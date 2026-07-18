@@ -190,12 +190,15 @@ class SchedulerService {
     List<BackupJobModel> jobs,
     List<SyncRuleModel> rules,
   ) {
+    final hasHomeWifiJobs = jobs.any(
+      (job) => _isAutomaticJob(job) && job.homeWifiName.trim().isNotEmpty,
+    );
     final hasHomeWifiRules = rules.any(
       (rule) =>
           _isAutomaticRule(rule) &&
           rule.triggerRule == SyncTriggerRule.onHomeWifi,
     );
-    if (hasHomeWifiRules) {
+    if (hasHomeWifiJobs || hasHomeWifiRules) {
       return _homeWifiMinimumInterval.inMinutes;
     }
 

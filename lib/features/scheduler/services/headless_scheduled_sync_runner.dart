@@ -83,6 +83,10 @@ class HeadlessScheduledSyncRunner {
         continue;
       }
 
+      if (!await _checkBackupNetworkPolicy(job)) {
+        continue;
+      }
+
       final ftpServer = _findFtpServer(ftpServers, job.ftpServerId);
       if (ftpServer == null) {
         await _recordMissingBackupServer(job);
@@ -228,6 +232,25 @@ class HeadlessScheduledSyncRunner {
         const Duration(days: 1),
       ),
     };
+  }
+
+  Future<bool> _checkBackupNetworkPolicy(BackupJobModel job) async {
+    if (!job.runOnWifiOnly && job.homeWifiName.trim().isEmpty) {
+      return true;
+    }
+
+    final connectivity = await Connectivity().checkConnectivity();
+    if (!connectivity.contains(ConnectivityResult.wifi)) {
+      return false;
+    }
+
+    final expectedSsid = job.homeWifiName.trim();
+    if (expectedSsid.isEmpty) {
+      return true;
+    }
+
+    final currentSsid = await WifiStatusService.currentSsid();
+    return currentSsid == expectedSsid;
   }
 
   Future<bool> _shouldRunRule(SyncRuleModel rule) async {

@@ -388,6 +388,13 @@ class _BackupJobTile extends ConsumerWidget {
                 label: _formatBytes(job.totalBytesBackedUp),
                 color: AppColors.success,
               ),
+              if (job.runOnWifiOnly)
+                const _StatusChip(
+                  label: 'Wi-Fi Only',
+                  color: AppColors.success,
+                ),
+              if (job.homeWifiName.isNotEmpty)
+                _StatusChip(label: job.homeWifiName, color: AppColors.primary),
             ],
           ),
           const SizedBox(height: AppSizes.paddingM),

@@ -70,6 +70,7 @@ File Picker
 - Android Data Sync Foreground Service Skeleton
 - Dart Backup Runner Foreground Service Handoff
 - Scheduled Backup Jobs
+- Backup Wi-Fi Schedule Rules
 
 ## Synchronization Module
 
@@ -201,7 +202,7 @@ Scheduler
 
 Pending:
 
-- Backup Wi-Fi Schedule Rules
+- Restore Module Foundation
 
 Milestone 6
 

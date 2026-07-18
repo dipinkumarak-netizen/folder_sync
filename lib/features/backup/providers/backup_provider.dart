@@ -1,9 +1,12 @@
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../ftp/models/ftp_server_model.dart';
 import '../../history/models/history_entry_model.dart';
 import '../../history/providers/history_provider.dart';
 import '../../repositories/backup_memory_repository.dart';
+import '../../sync/services/wifi_status_service.dart';
 import '../models/backup_job_model.dart';
 import '../services/backup_foreground_service.dart';
 
@@ -63,6 +66,25 @@ class BackupJobNotifier extends StateNotifier<List<BackupJobModel>> {
     required BackupJobModel job,
     required FtpServerModel ftpServer,
   }) async {
+    if (!job.enabled) {
+      return BackupRunResult(
+        success: false,
+        message: 'Enable this job before running it.',
+        filesBackedUp: 0,
+        bytesBackedUp: 0,
+        backedUpRelativePaths: job.backedUpRelativePaths,
+      );
+    }
+
+    final networkCheck = await _checkNetworkPolicy(job);
+    if (!networkCheck.success) {
+      final failedJob = _completeJob(job, networkCheck);
+      _repository.update(failedJob);
+      await _writeHistory(failedJob, ftpServer, networkCheck);
+      refresh();
+      return networkCheck;
+    }
+
     final runningJob = job.copyWith(
       status: BackupJobStatus.running,
       lastMessage: 'Backup is running...',
@@ -90,37 +112,131 @@ class BackupJobNotifier extends StateNotifier<List<BackupJobModel>> {
       await BackupForegroundServiceBridge.stop();
     }
 
-    final completedJob = runningJob.copyWith(
+    final completedJob = _completeJob(runningJob, result);
+    _repository.update(completedJob);
+    await _writeHistory(completedJob, ftpServer, result);
+    refresh();
+
+    return result;
+  }
+
+  BackupJobModel _completeJob(BackupJobModel job, BackupRunResult result) {
+    return job.copyWith(
       status: result.success ? BackupJobStatus.success : BackupJobStatus.failed,
       lastRunAt: DateTime.now(),
       lastMessage: result.message,
       lastFilesBackedUp: result.filesBackedUp,
-      totalFilesBackedUp: runningJob.totalFilesBackedUp + result.filesBackedUp,
-      totalBytesBackedUp: runningJob.totalBytesBackedUp + result.bytesBackedUp,
+      totalFilesBackedUp: job.totalFilesBackedUp + result.filesBackedUp,
+      totalBytesBackedUp: job.totalBytesBackedUp + result.bytesBackedUp,
       backedUpRelativePaths: result.backedUpRelativePaths,
     );
+  }
 
-    _repository.update(completedJob);
+  Future<BackupRunResult> _checkNetworkPolicy(BackupJobModel job) async {
+    if (!job.runOnWifiOnly && job.homeWifiName.trim().isEmpty) {
+      return BackupRunResult(
+        success: true,
+        message: '',
+        filesBackedUp: 0,
+        bytesBackedUp: 0,
+        backedUpRelativePaths: job.backedUpRelativePaths,
+      );
+    }
+
+    final connectivity = await Connectivity().checkConnectivity();
+    final isWifi = connectivity.contains(ConnectivityResult.wifi);
+    if (!isWifi) {
+      return BackupRunResult(
+        success: false,
+        message: 'Backup skipped because Wi-Fi is not connected.',
+        filesBackedUp: 0,
+        bytesBackedUp: 0,
+        backedUpRelativePaths: job.backedUpRelativePaths,
+      );
+    }
+
+    final expectedSsid = job.homeWifiName.trim();
+    if (expectedSsid.isEmpty) {
+      return BackupRunResult(
+        success: true,
+        message: '',
+        filesBackedUp: 0,
+        bytesBackedUp: 0,
+        backedUpRelativePaths: job.backedUpRelativePaths,
+      );
+    }
+
+    final hasWifiPermission = await _requestWifiNamePermissions();
+    if (!hasWifiPermission) {
+      return BackupRunResult(
+        success: false,
+        message:
+            'Backup skipped because Wi-Fi name permission was not granted.',
+        filesBackedUp: 0,
+        bytesBackedUp: 0,
+        backedUpRelativePaths: job.backedUpRelativePaths,
+      );
+    }
+
+    final currentSsid = await WifiStatusService.currentSsid();
+    if (currentSsid == null) {
+      return BackupRunResult(
+        success: false,
+        message:
+            'Backup skipped because the current Wi-Fi name is unavailable.',
+        filesBackedUp: 0,
+        bytesBackedUp: 0,
+        backedUpRelativePaths: job.backedUpRelativePaths,
+      );
+    }
+
+    if (currentSsid != expectedSsid) {
+      return BackupRunResult(
+        success: false,
+        message: 'Backup skipped because Wi-Fi is "$currentSsid".',
+        filesBackedUp: 0,
+        bytesBackedUp: 0,
+        backedUpRelativePaths: job.backedUpRelativePaths,
+      );
+    }
+
+    return BackupRunResult(
+      success: true,
+      message: '',
+      filesBackedUp: 0,
+      bytesBackedUp: 0,
+      backedUpRelativePaths: job.backedUpRelativePaths,
+    );
+  }
+
+  Future<bool> _requestWifiNamePermissions() async {
+    final nearbyStatus = await Permission.nearbyWifiDevices.request();
+    final locationStatus = await Permission.locationWhenInUse.request();
+    return nearbyStatus.isGranted || locationStatus.isGranted;
+  }
+
+  Future<void> _writeHistory(
+    BackupJobModel job,
+    FtpServerModel ftpServer,
+    BackupRunResult result,
+  ) async {
     await _historyNotifier.addEntry(
       HistoryEntryModel(
-        id: '${completedJob.id}-${DateTime.now().microsecondsSinceEpoch}',
+        id: '${job.id}-${DateTime.now().microsecondsSinceEpoch}',
         operationType: HistoryOperationType.backup,
         status: result.success
             ? HistoryEntryStatus.success
             : HistoryEntryStatus.failed,
-        title: completedJob.name,
+        title: job.name,
         message: result.message,
-        sourcePath: completedJob.localFolderPath,
-        targetPath: '${ftpServer.name}:${completedJob.remoteFolderPath}',
-        relatedId: completedJob.id,
+        sourcePath: job.localFolderPath,
+        targetPath: '${ftpServer.name}:${job.remoteFolderPath}',
+        relatedId: job.id,
         createdAt: DateTime.now(),
         filesChanged: result.filesBackedUp,
         bytesChanged: result.bytesBackedUp,
       ),
     );
-    refresh();
-
-    return result;
   }
 }
 

@@ -17,6 +17,8 @@ class BackupJobModel {
   final String remoteFolderPath;
   final bool enabled;
   final BackupScheduleRule scheduleRule;
+  final bool runOnWifiOnly;
+  final String homeWifiName;
   final BackupJobStatus status;
   final DateTime? lastRunAt;
   final String lastMessage;
@@ -33,6 +35,8 @@ class BackupJobModel {
     required this.remoteFolderPath,
     this.enabled = true,
     this.scheduleRule = BackupScheduleRule.manualOnly,
+    this.runOnWifiOnly = true,
+    this.homeWifiName = '',
     this.status = BackupJobStatus.idle,
     this.lastRunAt,
     this.lastMessage = 'Not run yet',
@@ -50,6 +54,8 @@ class BackupJobModel {
     String? remoteFolderPath,
     bool? enabled,
     BackupScheduleRule? scheduleRule,
+    bool? runOnWifiOnly,
+    String? homeWifiName,
     BackupJobStatus? status,
     DateTime? lastRunAt,
     String? lastMessage,
@@ -66,6 +72,8 @@ class BackupJobModel {
       remoteFolderPath: remoteFolderPath ?? this.remoteFolderPath,
       enabled: enabled ?? this.enabled,
       scheduleRule: scheduleRule ?? this.scheduleRule,
+      runOnWifiOnly: runOnWifiOnly ?? this.runOnWifiOnly,
+      homeWifiName: homeWifiName ?? this.homeWifiName,
       status: status ?? this.status,
       lastRunAt: lastRunAt ?? this.lastRunAt,
       lastMessage: lastMessage ?? this.lastMessage,
@@ -87,6 +95,8 @@ class BackupJobModel {
       'remoteFolderPath': remoteFolderPath,
       'enabled': enabled,
       'scheduleRule': scheduleRule.name,
+      'runOnWifiOnly': runOnWifiOnly,
+      'homeWifiName': homeWifiName,
       'status': status.name,
       'lastRunAt': lastRunAt?.toIso8601String(),
       'lastMessage': lastMessage,
@@ -116,6 +126,8 @@ class BackupJobModel {
         json['scheduleRule'],
         BackupScheduleRule.manualOnly,
       ),
+      runOnWifiOnly: json['runOnWifiOnly'] as bool? ?? true,
+      homeWifiName: json['homeWifiName'] as String? ?? '',
       status: status == BackupJobStatus.running ? BackupJobStatus.idle : status,
       lastRunAt: lastRunAtValue == null
           ? null
