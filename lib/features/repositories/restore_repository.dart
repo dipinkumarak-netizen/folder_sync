@@ -94,6 +94,10 @@ class RestoreRunResult {
   final int filesOverwritten;
   final int filesKeptBoth;
   final int bytesRestored;
+  final List<String> restoredRelativePaths;
+  final List<String> skippedRelativePaths;
+  final List<String> overwrittenRelativePaths;
+  final List<String> keptBothRelativePaths;
 
   const RestoreRunResult({
     required this.success,
@@ -104,6 +108,10 @@ class RestoreRunResult {
     required this.filesOverwritten,
     required this.filesKeptBoth,
     required this.bytesRestored,
+    this.restoredRelativePaths = const [],
+    this.skippedRelativePaths = const [],
+    this.overwrittenRelativePaths = const [],
+    this.keptBothRelativePaths = const [],
   });
 }
 
@@ -254,6 +262,10 @@ class RestoreRepository {
       var filesOverwritten = 0;
       var filesKeptBoth = 0;
       var bytesRestored = 0;
+      final restoredPaths = <String>[];
+      final skippedPaths = <String>[];
+      final overwrittenPaths = <String>[];
+      final keptBothPaths = <String>[];
 
       for (var index = 0; index < files.length; index += 1) {
         if (cancellationToken?.isCancelled == true) {
@@ -269,6 +281,10 @@ class RestoreRepository {
             filesOverwritten: filesOverwritten,
             filesKeptBoth: filesKeptBoth,
             bytesRestored: bytesRestored,
+            restoredRelativePaths: restoredPaths,
+            skippedRelativePaths: skippedPaths,
+            overwrittenRelativePaths: overwrittenPaths,
+            keptBothRelativePaths: keptBothPaths,
           );
         }
 
@@ -283,17 +299,21 @@ class RestoreRepository {
         switch (action) {
           case _RestoreDownloadAction.skipped:
             filesSkipped += 1;
+            skippedPaths.add(file.relativePath);
           case _RestoreDownloadAction.overwritten:
             filesOverwritten += 1;
             filesRestored += 1;
             bytesRestored += file.size;
+            overwrittenPaths.add(file.relativePath);
           case _RestoreDownloadAction.keptBoth:
             filesKeptBoth += 1;
             filesRestored += 1;
             bytesRestored += file.size;
+            keptBothPaths.add(file.relativePath);
           case _RestoreDownloadAction.restored:
             filesRestored += 1;
             bytesRestored += file.size;
+            restoredPaths.add(file.relativePath);
         }
 
         await onProgress?.call(
@@ -327,6 +347,10 @@ class RestoreRepository {
         filesOverwritten: filesOverwritten,
         filesKeptBoth: filesKeptBoth,
         bytesRestored: bytesRestored,
+        restoredRelativePaths: restoredPaths,
+        skippedRelativePaths: skippedPaths,
+        overwrittenRelativePaths: overwrittenPaths,
+        keptBothRelativePaths: keptBothPaths,
       );
     } catch (_) {
       return const RestoreRunResult(

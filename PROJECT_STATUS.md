@@ -129,6 +129,8 @@ File Picker
 - History Entry Model
 - Local History Persistence
 - History Screen
+- History Detail Screen
+- Per-Run File Report Foundation
 - Backup Run History Logging
 - History Filters
 - Clear History Action
@@ -248,10 +250,8 @@ History
 - Backup History
 - Sync History Foundation
 - Restore History Foundation
-
-Pending:
-
-- Restore History Logging
+- History Detail Screen
+- Per-Run File Report Foundation
 
 Milestone 8
 

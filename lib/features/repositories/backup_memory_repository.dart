@@ -23,6 +23,7 @@ class BackupRunResult {
   final int filesBackedUp;
   final int bytesBackedUp;
   final List<String> backedUpRelativePaths;
+  final List<String> runBackedUpRelativePaths;
 
   const BackupRunResult({
     required this.success,
@@ -30,6 +31,7 @@ class BackupRunResult {
     required this.filesBackedUp,
     required this.bytesBackedUp,
     required this.backedUpRelativePaths,
+    this.runBackedUpRelativePaths = const [],
   });
 }
 
@@ -159,6 +161,7 @@ class BackupMemoryRepository {
 
     var connected = false;
     final backedUpPaths = {...job.backedUpRelativePaths};
+    final runBackedUpPaths = <String>[];
     var filesBackedUp = 0;
     var bytesBackedUp = 0;
 
@@ -196,10 +199,12 @@ class BackupMemoryRepository {
             filesBackedUp: filesBackedUp,
             bytesBackedUp: bytesBackedUp,
             backedUpRelativePaths: backedUpPaths.toList()..sort(),
+            runBackedUpRelativePaths: runBackedUpPaths..sort(),
           );
         }
 
         backedUpPaths.add(relativePath);
+        runBackedUpPaths.add(relativePath);
         filesBackedUp += 1;
         bytesBackedUp += await file.length();
       }
@@ -210,6 +215,7 @@ class BackupMemoryRepository {
         filesBackedUp: filesBackedUp,
         bytesBackedUp: bytesBackedUp,
         backedUpRelativePaths: backedUpPaths.toList()..sort(),
+        runBackedUpRelativePaths: runBackedUpPaths..sort(),
       );
     } catch (_) {
       return BackupRunResult(
@@ -218,6 +224,7 @@ class BackupMemoryRepository {
         filesBackedUp: filesBackedUp,
         bytesBackedUp: bytesBackedUp,
         backedUpRelativePaths: backedUpPaths.toList()..sort(),
+        runBackedUpRelativePaths: runBackedUpPaths..sort(),
       );
     } finally {
       if (connected) {

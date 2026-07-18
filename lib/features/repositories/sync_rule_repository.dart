@@ -22,12 +22,26 @@ class SyncRunResult {
   final String message;
   final int filesChanged;
   final int bytesChanged;
+  final List<SyncRunFileReport> fileReports;
 
   const SyncRunResult({
     required this.success,
     required this.message,
     required this.filesChanged,
     required this.bytesChanged,
+    this.fileReports = const [],
+  });
+}
+
+class SyncRunFileReport {
+  final String relativePath;
+  final String action;
+  final int size;
+
+  const SyncRunFileReport({
+    required this.relativePath,
+    required this.action,
+    required this.size,
   });
 }
 
@@ -212,6 +226,7 @@ class SyncRuleRepository {
 
       var filesChanged = 0;
       var bytesChanged = 0;
+      final fileReports = <SyncRunFileReport>[];
 
       if (_shouldUpload(rule.direction)) {
         final result = await _uploadPendingFiles(
@@ -224,6 +239,7 @@ class SyncRuleRepository {
         );
         filesChanged += result.filesChanged;
         bytesChanged += result.bytesChanged;
+        fileReports.addAll(result.fileReports);
       }
 
       if (_shouldDownload(rule.direction)) {
@@ -237,6 +253,7 @@ class SyncRuleRepository {
         );
         filesChanged += result.filesChanged;
         bytesChanged += result.bytesChanged;
+        fileReports.addAll(result.fileReports);
       }
 
       final mirrorNote = _isMirrorRule(rule.direction)
@@ -251,6 +268,7 @@ class SyncRuleRepository {
         message: message,
         filesChanged: filesChanged,
         bytesChanged: bytesChanged,
+        fileReports: fileReports,
       );
     } catch (_) {
       return const SyncRunResult(
@@ -408,6 +426,7 @@ class SyncRuleRepository {
 
       var filesChanged = 0;
       var bytesChanged = 0;
+      final fileReports = <SyncRunFileReport>[];
 
       for (final item in items) {
         if (item.target == SyncDeleteTarget.local) {
@@ -422,6 +441,13 @@ class SyncRuleRepository {
 
         filesChanged += 1;
         bytesChanged += item.size;
+        fileReports.add(
+          SyncRunFileReport(
+            relativePath: item.relativePath,
+            action: 'delete',
+            size: item.size,
+          ),
+        );
       }
 
       return SyncRunResult(
@@ -431,6 +457,7 @@ class SyncRuleRepository {
             : 'Deleted $filesChanged file(s) after preview confirmation.',
         filesChanged: filesChanged,
         bytesChanged: bytesChanged,
+        fileReports: fileReports,
       );
     } catch (_) {
       return const SyncRunResult(
@@ -466,6 +493,7 @@ class SyncRuleRepository {
   }) async {
     var filesChanged = 0;
     var bytesChanged = 0;
+    final fileReports = <SyncRunFileReport>[];
 
     for (final localEntry in localFiles.values) {
       final remoteEntry = remoteFiles[localEntry.relativePath];
@@ -502,6 +530,13 @@ class SyncRuleRepository {
 
       filesChanged += 1;
       bytesChanged += localEntry.size;
+      fileReports.add(
+        SyncRunFileReport(
+          relativePath: uploadName,
+          action: 'upload',
+          size: localEntry.size,
+        ),
+      );
     }
 
     return SyncRunResult(
@@ -509,6 +544,7 @@ class SyncRuleRepository {
       message: '',
       filesChanged: filesChanged,
       bytesChanged: bytesChanged,
+      fileReports: fileReports,
     );
   }
 
@@ -522,6 +558,7 @@ class SyncRuleRepository {
   }) async {
     var filesChanged = 0;
     var bytesChanged = 0;
+    final fileReports = <SyncRunFileReport>[];
 
     for (final remoteEntry in remoteFiles.values) {
       final localEntry = localFiles[remoteEntry.relativePath];
@@ -558,6 +595,13 @@ class SyncRuleRepository {
 
       filesChanged += 1;
       bytesChanged += remoteEntry.size;
+      fileReports.add(
+        SyncRunFileReport(
+          relativePath: remoteEntry.relativePath,
+          action: 'download',
+          size: remoteEntry.size,
+        ),
+      );
     }
 
     return SyncRunResult(
@@ -565,6 +609,7 @@ class SyncRuleRepository {
       message: '',
       filesChanged: filesChanged,
       bytesChanged: bytesChanged,
+      fileReports: fileReports,
     );
   }
 

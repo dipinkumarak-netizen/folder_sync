@@ -7,6 +7,7 @@ import '../../../core/constants/app_sizes.dart';
 import '../../../core/widgets/ob_card.dart';
 import '../models/history_entry_model.dart';
 import '../providers/history_provider.dart';
+import 'history_detail_screen.dart';
 
 /// ===============================================================
 /// OpenBackup
@@ -61,7 +62,17 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             ...filteredEntries.map(
               (entry) => Padding(
                 padding: const EdgeInsets.only(bottom: AppSizes.paddingM),
-                child: _HistoryEntryTile(entry: entry),
+                child: _HistoryEntryTile(
+                  entry: entry,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => HistoryDetailScreen(entry: entry),
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
         ],
@@ -209,15 +220,17 @@ class _EmptyHistory extends StatelessWidget {
 }
 
 class _HistoryEntryTile extends StatelessWidget {
-  const _HistoryEntryTile({required this.entry});
+  const _HistoryEntryTile({required this.entry, required this.onTap});
 
   final HistoryEntryModel entry;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final statusColor = _statusColor(entry.status);
 
     return OBCard(
+      onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

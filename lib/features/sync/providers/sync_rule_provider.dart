@@ -312,6 +312,15 @@ class SyncRuleNotifier extends StateNotifier<List<SyncRuleModel>> {
         createdAt: DateTime.now(),
         filesChanged: result.filesChanged,
         bytesChanged: result.bytesChanged,
+        fileReports: result.fileReports
+            .map(
+              (item) => HistoryFileReportItem(
+                relativePath: item.relativePath,
+                action: item.action,
+                size: item.size,
+              ),
+            )
+            .toList(),
       ),
     );
   }

@@ -324,8 +324,37 @@ class RestoreNotifier extends StateNotifier<RestoreState> {
         createdAt: DateTime.now(),
         filesChanged: result.filesRestored,
         bytesChanged: result.bytesRestored,
+        fileReports: _fileReports(result),
       ),
     );
+  }
+
+  List<HistoryFileReportItem> _fileReports(RestoreRunResult result) {
+    return [
+      ...result.restoredRelativePaths.map(
+        (relativePath) => HistoryFileReportItem(
+          relativePath: relativePath,
+          action: 'download',
+        ),
+      ),
+      ...result.skippedRelativePaths.map(
+        (relativePath) => HistoryFileReportItem(
+          relativePath: relativePath,
+          action: 'skip',
+          message: 'Existing local file',
+        ),
+      ),
+      ...result.overwrittenRelativePaths.map(
+        (relativePath) => HistoryFileReportItem(
+          relativePath: relativePath,
+          action: 'overwrite',
+        ),
+      ),
+      ...result.keptBothRelativePaths.map(
+        (relativePath) =>
+            HistoryFileReportItem(relativePath: relativePath, action: 'copy'),
+      ),
+    ];
   }
 
   String _previewMessage(

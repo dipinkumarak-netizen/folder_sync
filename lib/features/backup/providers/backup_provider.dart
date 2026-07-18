@@ -243,6 +243,14 @@ class BackupJobNotifier extends StateNotifier<List<BackupJobModel>> {
         createdAt: DateTime.now(),
         filesChanged: result.filesBackedUp,
         bytesChanged: result.bytesBackedUp,
+        fileReports: result.runBackedUpRelativePaths
+            .map(
+              (relativePath) => HistoryFileReportItem(
+                relativePath: relativePath,
+                action: 'upload',
+              ),
+            )
+            .toList(),
       ),
     );
   }
