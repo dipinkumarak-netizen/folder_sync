@@ -126,7 +126,7 @@ class _BackupJobFormScreenState extends ConsumerState<BackupJobFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final ftpServerLoadState = ref.watch(ftpServerLoadProvider);
+    ref.watch(ftpServerLoadProvider);
     final ftpServers = ref.watch(ftpServerProvider);
     if (_selectedFtpServerId == null && ftpServers.length == 1) {
       _selectedFtpServerId = ftpServers.first.id;
@@ -165,34 +165,18 @@ class _BackupJobFormScreenState extends ConsumerState<BackupJobFormScreen> {
                     value == null || value.trim().isEmpty ? 'Required' : null,
               ),
               const SizedBox(height: AppSizes.paddingM),
-              ftpServerLoadState.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (_, _) => _FtpServerDropdown(
-                  selectedFtpServerId: _selectedFtpServerId,
-                  ftpServers: ftpServers,
-                  inputDecoration: _inputDecoration(
-                    'FTP Server',
-                    AppIcons.server,
-                  ),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedFtpServerId = value;
-                    });
-                  },
+              _FtpServerDropdown(
+                selectedFtpServerId: _selectedFtpServerId,
+                ftpServers: ftpServers,
+                inputDecoration: _inputDecoration(
+                  'FTP Server',
+                  AppIcons.server,
                 ),
-                data: (_) => _FtpServerDropdown(
-                  selectedFtpServerId: _selectedFtpServerId,
-                  ftpServers: ftpServers,
-                  inputDecoration: _inputDecoration(
-                    'FTP Server',
-                    AppIcons.server,
-                  ),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedFtpServerId = value;
-                    });
-                  },
-                ),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedFtpServerId = value;
+                  });
+                },
               ),
               const SizedBox(height: AppSizes.paddingM),
               TextFormField(

@@ -19,7 +19,7 @@ class FtpServerListScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final loadState = ref.watch(ftpServerLoadProvider);
+    ref.watch(ftpServerLoadProvider);
     final servers = ref.watch(ftpServerProvider);
 
     return Scaffold(
@@ -35,21 +35,17 @@ class FtpServerListScreen extends ConsumerWidget {
         },
         child: const Icon(Icons.add),
       ),
-      body: loadState.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, _) => const _EmptyServerList(),
-        data: (_) => servers.isEmpty
-            ? const _EmptyServerList()
-            : ListView.separated(
-                padding: const EdgeInsets.all(AppSizes.paddingM),
-                itemCount: servers.length,
-                separatorBuilder: (_, _) =>
-                    const SizedBox(height: AppSizes.paddingM),
-                itemBuilder: (context, index) {
-                  return _FtpServerTile(server: servers[index]);
-                },
-              ),
-      ),
+      body: servers.isEmpty
+          ? const _EmptyServerList()
+          : ListView.separated(
+              padding: const EdgeInsets.all(AppSizes.paddingM),
+              itemCount: servers.length,
+              separatorBuilder: (_, _) =>
+                  const SizedBox(height: AppSizes.paddingM),
+              itemBuilder: (context, index) {
+                return _FtpServerTile(server: servers[index]);
+              },
+            ),
     );
   }
 }

@@ -31,11 +31,10 @@ class BackupJobListScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final backupLoadState = ref.watch(backupJobLoadProvider);
-    final ftpLoadState = ref.watch(ftpServerLoadProvider);
+    ref.watch(backupJobLoadProvider);
+    ref.watch(ftpServerLoadProvider);
     final jobs = ref.watch(backupJobProvider);
     final ftpServers = ref.watch(ftpServerProvider);
-    final isLoading = backupLoadState.isLoading || ftpLoadState.isLoading;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -45,9 +44,7 @@ class BackupJobListScreen extends ConsumerWidget {
         onPressed: () => _openForm(context),
         child: const Icon(AppIcons.add),
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : jobs.isEmpty
+      body: jobs.isEmpty
           ? _EmptyBackupJobs(hasFtpServers: ftpServers.isNotEmpty)
           : ListView.separated(
               padding: const EdgeInsets.all(AppSizes.paddingM),
