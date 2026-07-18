@@ -4,6 +4,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:folder_sync/main.dart';
 
 void main() {
+  Future<void> tapDashboardCard(WidgetTester tester, String subtitle) async {
+    await tester.scrollUntilVisible(
+      find.text(subtitle),
+      320,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(subtitle));
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('App opens splash and navigates to dashboard', (
     WidgetTester tester,
   ) async {
@@ -36,8 +47,7 @@ void main() {
     expect(find.text('Mirror and two-way sync'), findsOneWidget);
     expect(find.text('Backup history and logs'), findsOneWidget);
 
-    await tester.tap(find.text('Backup history and logs'));
-    await tester.pumpAndSettle();
+    await tapDashboardCard(tester, 'Backup history and logs');
 
     expect(find.text('No History Yet'), findsOneWidget);
     expect(
@@ -50,8 +60,7 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Mirror and two-way sync'));
-    await tester.pumpAndSettle();
+    await tapDashboardCard(tester, 'Mirror and two-way sync');
 
     expect(find.text('No Sync Rules'), findsOneWidget);
     expect(
@@ -62,8 +71,7 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Create and manage backup jobs'));
-    await tester.pumpAndSettle();
+    await tapDashboardCard(tester, 'Create and manage backup jobs');
 
     expect(find.text('No Backup Jobs'), findsOneWidget);
     expect(
@@ -74,8 +82,7 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Configure FTP connections'));
-    await tester.pumpAndSettle();
+    await tapDashboardCard(tester, 'Configure FTP connections');
 
     expect(find.text('No FTP Servers'), findsOneWidget);
 

@@ -47,6 +47,7 @@ File Picker
 - Dark Theme
 - Navigation
 - Dashboard
+- Dashboard Readiness Status
 - Splash Screen
 
 ## FTP Module

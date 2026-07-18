@@ -11,6 +11,7 @@ import '../../restore/presentation/restore_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
 import '../../sync/presentation/sync_rule_list_screen.dart';
 import '../widgets/dashboard_card.dart';
+import '../widgets/readiness_status_card.dart';
 import '../widgets/system_status_card.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -29,6 +30,10 @@ class HomeScreen extends StatelessWidget {
           const SizedBox(height: AppSizes.paddingL),
 
           const SystemStatusCard(),
+
+          const SizedBox(height: AppSizes.paddingM),
+
+          const ReadinessStatusCard(),
 
           const SizedBox(height: AppSizes.paddingL),
 
