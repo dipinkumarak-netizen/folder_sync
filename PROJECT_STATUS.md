@@ -55,6 +55,15 @@ File Picker
 - FTP Server Model
 - FTP Memory Repository
 - FTP Provider
+- FTP Connection Testing
+
+## Backup Module
+
+- Backup Job List Screen
+- Backup Job Form Screen
+- Local Folder Picker
+- Manual New-Files-Only FTP Backup
+- Backup Run Status Summary
 
 ---
 
@@ -111,9 +120,17 @@ Milestone 3
 
 Working Backup
 
-- Folder Picker
-- Backup Job
+- Select Local Folder
+- Select FTP Server
 - Manual Backup
+- New Files Only Tracking
+- Backup Job Status
+
+Pending:
+
+- Persistent Backup Jobs
+- Background Folder Watching
+- Scheduled Backup
 
 Milestone 4
 
@@ -143,4 +160,4 @@ GitHub Open Source Release
 
 Last Updated
 
-2026-06-29
+2026-07-18

@@ -22,6 +22,19 @@ void main() {
 
     expect(find.text('System Status'), findsOneWidget);
     expect(find.text('Configure FTP connections'), findsOneWidget);
+    expect(find.text('Create and manage backup jobs'), findsOneWidget);
+
+    await tester.tap(find.text('Create and manage backup jobs'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('No Backup Jobs'), findsOneWidget);
+    expect(
+      find.text('Add an FTP server first, then create a backup job.'),
+      findsOneWidget,
+    );
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('Configure FTP connections'));
     await tester.pumpAndSettle();
