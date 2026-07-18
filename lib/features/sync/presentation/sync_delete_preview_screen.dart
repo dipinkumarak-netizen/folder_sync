@@ -35,6 +35,7 @@ class SyncDeletePreviewScreen extends ConsumerStatefulWidget {
 class _SyncDeletePreviewScreenState
     extends ConsumerState<SyncDeletePreviewScreen> {
   late Future<SyncDeletePreviewResult> _previewFuture;
+  bool _isDeleting = false;
 
   @override
   void initState() {
@@ -50,6 +51,67 @@ class _SyncDeletePreviewScreenState
 
   void _refreshPreview() {
     setState(() {
+      _previewFuture = _loadPreview();
+    });
+  }
+
+  Future<void> _confirmAndExecuteDeletes(
+    SyncDeletePreviewResult preview,
+  ) async {
+    if (preview.items.isEmpty || _isDeleting) {
+      return;
+    }
+
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Confirm Protected Delete'),
+          content: Text(
+            'Delete ${preview.items.length} file(s) from this sync rule?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete != true || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _isDeleting = true;
+    });
+
+    final result = await ref
+        .read(syncRuleProvider.notifier)
+        .executeProtectedDeletes(
+          rule: widget.rule,
+          ftpServer: widget.ftpServer,
+        );
+
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(result.message),
+        backgroundColor: result.success ? AppColors.success : AppColors.error,
+      ),
+    );
+
+    setState(() {
+      _isDeleting = false;
       _previewFuture = _loadPreview();
     });
   }
@@ -105,6 +167,8 @@ class _SyncDeletePreviewScreenState
                   rule: widget.rule,
                   ftpServer: widget.ftpServer,
                   result: result,
+                  isDeleting: _isDeleting,
+                  onExecuteDeletes: () => _confirmAndExecuteDeletes(result),
                 );
               }
 
@@ -122,11 +186,15 @@ class _PreviewSummary extends StatelessWidget {
     required this.rule,
     required this.ftpServer,
     required this.result,
+    required this.isDeleting,
+    required this.onExecuteDeletes,
   });
 
   final SyncRuleModel rule;
   final FtpServerModel ftpServer;
   final SyncDeletePreviewResult result;
+  final bool isDeleting;
+  final VoidCallback onExecuteDeletes;
 
   @override
   Widget build(BuildContext context) {
@@ -190,6 +258,22 @@ class _PreviewSummary extends StatelessWidget {
           ),
           const SizedBox(height: AppSizes.paddingM),
           Text(result.message, style: Theme.of(context).textTheme.bodyMedium),
+          if (hasDeletes) ...[
+            const SizedBox(height: AppSizes.paddingM),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: isDeleting ? null : onExecuteDeletes,
+                icon: isDeleting
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(AppIcons.delete),
+                label: Text(isDeleting ? 'Deleting' : 'Confirm Delete'),
+              ),
+            ),
+          ],
           if (!hasDeletes) ...[
             const SizedBox(height: AppSizes.paddingL),
             Center(

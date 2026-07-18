@@ -197,14 +197,13 @@ class SyncRuleRepository {
       }
 
       final remoteRoot = _normalizeRemotePath(rule.remoteFolderPath);
-      await _changeRemoteDirectory(ftpConnect, remoteRoot);
+      await _changeOrCreateRemoteDirectory(ftpConnect, remoteRoot);
 
       final localFiles = await _collectLocalFiles(localDirectory, rule);
       final remoteFiles = await _collectRemoteFiles(
         ftpConnect: ftpConnect,
         remoteRoot: remoteRoot,
         rule: rule,
-        createDirectories: false,
       );
 
       var filesChanged = 0;
@@ -237,7 +236,7 @@ class SyncRuleRepository {
       }
 
       final mirrorNote = _isMirrorRule(rule.direction)
-          ? ' Delete mirroring was skipped until preview support is added.'
+          ? ' Delete mirroring requires Delete Preview confirmation.'
           : '';
       final message = filesChanged == 0
           ? 'No sync changes found.$mirrorNote'
@@ -304,30 +303,23 @@ class SyncRuleRepository {
       }
 
       final remoteRoot = _normalizeRemotePath(rule.remoteFolderPath);
-      await _changeOrCreateRemoteDirectory(ftpConnect, remoteRoot);
+      await _changeRemoteDirectory(ftpConnect, remoteRoot);
 
       final localFiles = await _collectLocalFiles(localDirectory, rule);
       final remoteFiles = await _collectRemoteFiles(
         ftpConnect: ftpConnect,
         remoteRoot: remoteRoot,
         rule: rule,
+        createDirectories: false,
       );
 
-      final items =
-          _collectDeletePreviewItems(
-            rule: rule,
-            localFiles: localFiles,
-            remoteFiles: remoteFiles,
-          )..sort((first, second) {
-            final targetCompare = first.target.index.compareTo(
-              second.target.index,
-            );
-            if (targetCompare != 0) {
-              return targetCompare;
-            }
-
-            return first.relativePath.compareTo(second.relativePath);
-          });
+      final items = _sortedDeletePreviewItems(
+        _collectDeletePreviewItems(
+          rule: rule,
+          localFiles: localFiles,
+          remoteFiles: remoteFiles,
+        ),
+      );
 
       return SyncDeletePreviewResult(
         success: true,
@@ -341,6 +333,107 @@ class SyncRuleRepository {
         success: false,
         message: 'Delete preview failed. Check folders and FTP server.',
         items: [],
+      );
+    } finally {
+      if (connected) {
+        await ftpConnect.disconnect();
+      }
+    }
+  }
+
+  Future<SyncRunResult> executeProtectedDeletes({
+    required SyncRuleModel rule,
+    required FtpServerModel ftpServer,
+  }) async {
+    final localDirectory = Directory(rule.localFolderPath);
+    if (!await localDirectory.exists()) {
+      return const SyncRunResult(
+        success: false,
+        message: 'Local folder is not available.',
+        filesChanged: 0,
+        bytesChanged: 0,
+      );
+    }
+
+    if (!_needsProtectedDeletePreview(rule)) {
+      return const SyncRunResult(
+        success: true,
+        message: 'No destructive delete rule is enabled.',
+        filesChanged: 0,
+        bytesChanged: 0,
+      );
+    }
+
+    final ftpConnect = FTPConnect(
+      ftpServer.host,
+      port: ftpServer.port,
+      user: ftpServer.isAnonymous ? 'anonymous' : ftpServer.username,
+      pass: ftpServer.isAnonymous ? '' : ftpServer.password,
+      timeout: 30,
+    );
+
+    var connected = false;
+    try {
+      connected = await ftpConnect.connect();
+      if (!connected) {
+        return const SyncRunResult(
+          success: false,
+          message: 'Could not connect to the FTP server.',
+          filesChanged: 0,
+          bytesChanged: 0,
+        );
+      }
+
+      final remoteRoot = _normalizeRemotePath(rule.remoteFolderPath);
+      await _changeRemoteDirectory(ftpConnect, remoteRoot);
+
+      final localFiles = await _collectLocalFiles(localDirectory, rule);
+      final remoteFiles = await _collectRemoteFiles(
+        ftpConnect: ftpConnect,
+        remoteRoot: remoteRoot,
+        rule: rule,
+        createDirectories: false,
+      );
+      final items = _sortedDeletePreviewItems(
+        _collectDeletePreviewItems(
+          rule: rule,
+          localFiles: localFiles,
+          remoteFiles: remoteFiles,
+        ),
+      );
+
+      var filesChanged = 0;
+      var bytesChanged = 0;
+
+      for (final item in items) {
+        if (item.target == SyncDeleteTarget.local) {
+          await _deleteLocalFile(localDirectory, item.relativePath);
+        } else {
+          await _deleteRemoteFile(
+            ftpConnect: ftpConnect,
+            remoteRoot: remoteRoot,
+            relativePath: item.relativePath,
+          );
+        }
+
+        filesChanged += 1;
+        bytesChanged += item.size;
+      }
+
+      return SyncRunResult(
+        success: true,
+        message: filesChanged == 0
+            ? 'No protected delete changes found.'
+            : 'Deleted $filesChanged file(s) after preview confirmation.',
+        filesChanged: filesChanged,
+        bytesChanged: bytesChanged,
+      );
+    } catch (_) {
+      return const SyncRunResult(
+        success: false,
+        message: 'Protected delete failed. Check folders and FTP server.',
+        filesChanged: 0,
+        bytesChanged: 0,
       );
     } finally {
       if (connected) {
@@ -786,6 +879,56 @@ class SyncRuleRepository {
     }
 
     return itemsByKey.values.toList();
+  }
+
+  List<SyncDeletePreviewItem> _sortedDeletePreviewItems(
+    List<SyncDeletePreviewItem> items,
+  ) {
+    return items..sort((first, second) {
+      final targetCompare = first.target.index.compareTo(second.target.index);
+      if (targetCompare != 0) {
+        return targetCompare;
+      }
+
+      return first.relativePath.compareTo(second.relativePath);
+    });
+  }
+
+  Future<void> _deleteLocalFile(
+    Directory localDirectory,
+    String relativePath,
+  ) async {
+    final rootPath = path.normalize(localDirectory.path);
+    final filePath = path.normalize(path.join(rootPath, relativePath));
+    if (!path.isWithin(rootPath, filePath)) {
+      throw StateError('Refusing to delete outside the local folder.');
+    }
+
+    final file = File(filePath);
+    if (!await file.exists()) {
+      return;
+    }
+
+    await file.delete();
+  }
+
+  Future<void> _deleteRemoteFile({
+    required FTPConnect ftpConnect,
+    required String remoteRoot,
+    required String relativePath,
+  }) async {
+    await _changeRemoteDirectory(ftpConnect, remoteRoot);
+    final remoteDirectory = path.posix.dirname(relativePath);
+    if (remoteDirectory != '.') {
+      await _changeRemoteDirectory(ftpConnect, remoteDirectory);
+    }
+
+    final deleted = await ftpConnect.deleteFile(
+      path.posix.basename(relativePath),
+    );
+    if (!deleted) {
+      throw StateError('Could not delete remote file $relativePath.');
+    }
   }
 
   String _relativePath(String from, String filePath) {

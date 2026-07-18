@@ -129,6 +129,58 @@ class SyncRuleNotifier extends StateNotifier<List<SyncRuleModel>> {
     return _repository.previewDeletes(rule: rule, ftpServer: ftpServer);
   }
 
+  Future<SyncRunResult> executeProtectedDeletes({
+    required SyncRuleModel rule,
+    required FtpServerModel ftpServer,
+  }) async {
+    if (!rule.enabled) {
+      return const SyncRunResult(
+        success: false,
+        message: 'Enable this sync rule before running protected deletes.',
+        filesChanged: 0,
+        bytesChanged: 0,
+      );
+    }
+
+    final networkCheck = await _checkNetworkPolicy(rule);
+    if (!networkCheck.success) {
+      final failedRule = _completeRule(rule, networkCheck);
+      _repository.update(failedRule);
+      await _writeHistory(failedRule, ftpServer, networkCheck);
+      refresh();
+      return networkCheck;
+    }
+
+    final runningRule = rule.copyWith(
+      status: SyncRuleStatus.running,
+      lastMessage: 'Protected deletes are running...',
+    );
+    _repository.update(runningRule);
+    refresh();
+
+    SyncRunResult result;
+    try {
+      result = await _repository.executeProtectedDeletes(
+        rule: runningRule,
+        ftpServer: ftpServer,
+      );
+    } catch (_) {
+      result = const SyncRunResult(
+        success: false,
+        message: 'Protected delete failed unexpectedly.',
+        filesChanged: 0,
+        bytesChanged: 0,
+      );
+    }
+
+    final completedRule = _completeRule(runningRule, result);
+    _repository.update(completedRule);
+    await _writeHistory(completedRule, ftpServer, result);
+    refresh();
+
+    return result;
+  }
+
   SyncRuleModel _completeRule(SyncRuleModel rule, SyncRunResult result) {
     return rule.copyWith(
       status: result.success ? SyncRuleStatus.success : SyncRuleStatus.failed,

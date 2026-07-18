@@ -85,6 +85,7 @@ File Picker
 - Wi-Fi Only Sync Enforcement
 - Home Wi-Fi Name Check Foundation
 - Protected Delete Preview Screen
+- Confirmed Delete Rule Execution
 
 ## History Module
 
@@ -176,8 +177,6 @@ Pending:
 
 - Remote File Diffing
 - Foreground Sync Progress
-- Destructive Mirror Delete Execution
-- Confirmed Delete Rule Execution
 
 Milestone 5
 
