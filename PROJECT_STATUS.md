@@ -88,6 +88,13 @@ File Picker
 - Confirmed Delete Rule Execution
 - Foreground Sync Progress
 
+## Scheduler Module
+
+- In-App Sync Scheduler Foundation
+- Hourly Sync Rule Trigger
+- Daily Sync Rule Trigger
+- Home Wi-Fi Sync Rule Trigger Foundation
+
 ## History Module
 
 - History Entry Model
@@ -181,6 +188,14 @@ Pending:
 Milestone 5
 
 Scheduler
+
+- In-App Sync Scheduler Foundation
+- Sync Rule Trigger Evaluation
+
+Pending:
+
+- Android Background Scheduler
+- Scheduled Backup Jobs
 
 Milestone 6
 
