@@ -67,6 +67,7 @@ File Picker
 - Backup Job List Screen
 - Backup Job Form Screen
 - Local Folder Picker
+- Remote Folder Picker
 - Manual New-Files-Only FTP Backup
 - Backup Run Status Summary
 - Local Backup Job Persistence
@@ -84,6 +85,7 @@ File Picker
 - Conflict Rules
 - Delete Rules
 - File Filter Rules
+- Remote Folder Picker
 - Wi-Fi Only and Home Wi-Fi Rules
 - Local Sync Rule Persistence
 - Manual Sync Runner
@@ -98,6 +100,7 @@ File Picker
 
 - Restore Screen
 - FTP Restore Preview
+- Remote Folder Picker
 - Manual FTP Restore Runner
 - Existing Local File Skip Protection
 - Restore Conflict Rules

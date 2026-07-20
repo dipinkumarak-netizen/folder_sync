@@ -11,6 +11,7 @@ import '../../../core/widgets/ob_card.dart';
 import '../../ftp/models/ftp_server_model.dart';
 import '../../ftp/presentation/ftp_server_list_screen.dart';
 import '../../ftp/providers/ftp_provider.dart';
+import '../../ftp/widgets/remote_folder_picker_field.dart';
 import '../../repositories/restore_repository.dart';
 import '../providers/restore_provider.dart';
 
@@ -214,6 +215,7 @@ class _RestoreScreenState extends ConsumerState<RestoreScreen> {
                         _clearPreviewAfterInputChange();
                       },
                 onPickDestination: isBusy ? null : _pickDestinationFolder,
+                selectedFtpServer: _selectedFtpServer(ftpServers),
                 onRemoteFolderChanged: isBusy
                     ? null
                     : (_) => _clearPreviewAfterInputChange(),
@@ -452,6 +454,7 @@ class _RestoreFormCard extends StatelessWidget {
     required this.inputDecoration,
     required this.onFtpChanged,
     required this.onPickDestination,
+    required this.selectedFtpServer,
     required this.onRemoteFolderChanged,
     required this.onIncludeSubfoldersChanged,
     required this.onIncludeHiddenFilesChanged,
@@ -472,6 +475,7 @@ class _RestoreFormCard extends StatelessWidget {
   final InputDecoration Function(String label, IconData icon) inputDecoration;
   final ValueChanged<String?>? onFtpChanged;
   final VoidCallback? onPickDestination;
+  final FtpServerModel? selectedFtpServer;
   final ValueChanged<String>? onRemoteFolderChanged;
   final ValueChanged<bool>? onIncludeSubfoldersChanged;
   final ValueChanged<bool>? onIncludeHiddenFilesChanged;
@@ -497,8 +501,10 @@ class _RestoreFormCard extends StatelessWidget {
                 value == null ? 'Add or select an FTP server' : null,
           ),
           const SizedBox(height: AppSizes.paddingM),
-          TextFormField(
+          RemoteFolderPickerField(
             controller: remoteFolderController,
+            ftpServer: selectedFtpServer,
+            enabled: onRemoteFolderChanged != null,
             onChanged: onRemoteFolderChanged,
             decoration: inputDecoration(
               'Remote Backup Folder',

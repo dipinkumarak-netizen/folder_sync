@@ -151,12 +151,10 @@ class FtpMemoryRepository {
         );
       }
 
-      final changed = await ftpConnect.changeDirectory(remotePath);
-      return FtpConnectionTestResult(
-        success: changed,
-        message: changed
-            ? 'FTP connection successful.'
-            : 'FTP connected, but the remote folder was not available.',
+      await _changeRemoteDirectory(ftpConnect, remotePath);
+      return const FtpConnectionTestResult(
+        success: true,
+        message: 'FTP connection successful.',
       );
     } catch (error) {
       return FtpConnectionTestResult(
@@ -292,12 +290,14 @@ class FtpMemoryRepository {
   ) async {
     final normalizedPath = _normalizeRemotePath(remotePath);
     if (normalizedPath == '/' || normalizedPath == '.') {
-      await ftpConnect.changeDirectory('/');
       return;
     }
 
     if (normalizedPath.startsWith('/')) {
-      await ftpConnect.changeDirectory('/');
+      final changed = await ftpConnect.changeDirectory(normalizedPath);
+      if (changed) {
+        return;
+      }
     }
 
     final parts = normalizedPath

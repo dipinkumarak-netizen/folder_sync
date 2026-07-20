@@ -8,6 +8,7 @@ import '../../../core/constants/app_icons.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../ftp/models/ftp_server_model.dart';
 import '../../ftp/providers/ftp_provider.dart';
+import '../../ftp/widgets/remote_folder_picker_field.dart';
 import '../../settings/providers/app_settings_provider.dart';
 import '../models/backup_job_model.dart';
 import '../providers/backup_provider.dart';
@@ -136,6 +137,16 @@ class _BackupJobFormScreenState extends ConsumerState<BackupJobFormScreen> {
     Navigator.pop(context);
   }
 
+  FtpServerModel? _selectedFtpServer(List<FtpServerModel> ftpServers) {
+    for (final server in ftpServers) {
+      if (server.id == _selectedFtpServerId) {
+        return server;
+      }
+    }
+
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final settingsLoad = ref.watch(appSettingsLoadProvider);
@@ -197,8 +208,9 @@ class _BackupJobFormScreenState extends ConsumerState<BackupJobFormScreen> {
                 },
               ),
               const SizedBox(height: AppSizes.paddingM),
-              TextFormField(
+              RemoteFolderPickerField(
                 controller: _remoteFolderController,
+                ftpServer: _selectedFtpServer(ftpServers),
                 decoration: _inputDecoration('Remote Folder', AppIcons.folder),
               ),
               const SizedBox(height: AppSizes.paddingM),
