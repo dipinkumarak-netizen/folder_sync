@@ -37,4 +37,8 @@ class SyncForegroundServiceBridge {
       return;
     }
   }
+
+  static Future<void> update({required String message}) async {
+    await start(message: message);
+  }
 }

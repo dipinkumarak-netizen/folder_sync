@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/models/transfer_progress_snapshot.dart';
 import '../../../core/utils/failure_message.dart';
 import '../../ftp/models/ftp_server_model.dart';
 import '../../history/models/history_entry_model.dart';
@@ -265,7 +266,9 @@ class RestoreNotifier extends StateNotifier<RestoreState> {
           );
 
           if (foregroundStarted) {
-            await RestoreForegroundServiceBridge.update(message: message);
+            await RestoreForegroundServiceBridge.update(
+              message: _notificationProgressMessage(state),
+            );
           }
         },
       );
@@ -387,6 +390,23 @@ class RestoreNotifier extends StateNotifier<RestoreState> {
     }
 
     return '${result.message} ${conflictPreview.existingConflicts} local conflict(s) found.';
+  }
+
+  String _notificationProgressMessage(RestoreState state) {
+    final now = DateTime.now();
+    return TransferProgressSnapshot(
+      title: 'Restore Progress',
+      status: state.message,
+      currentFilePath: state.currentFilePath,
+      processedFiles: state.currentFileIndex,
+      totalFiles: state.totalFiles,
+      processedBytes: state.lastBytesRestored,
+      startedAt: state.transferStartedAt ?? now,
+      updatedAt: state.transferUpdatedAt ?? now,
+      active:
+          state.status == RestoreStatus.running ||
+          state.status == RestoreStatus.cancelling,
+    ).notificationMessage();
   }
 }
 

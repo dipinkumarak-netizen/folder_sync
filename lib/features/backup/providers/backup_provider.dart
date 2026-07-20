@@ -121,7 +121,9 @@ class BackupJobNotifier extends StateNotifier<List<BackupJobModel>> {
 
     var foregroundStarted = false;
     if (_readSettings().showForegroundNotifications) {
-      foregroundStarted = await BackupForegroundServiceBridge.start();
+      foregroundStarted = await BackupForegroundServiceBridge.start(
+        message: 'Preparing backup...',
+      );
     }
 
     BackupRunResult result;
@@ -129,8 +131,8 @@ class BackupJobNotifier extends StateNotifier<List<BackupJobModel>> {
       result = await _repository.runBackup(
         job: runningJob,
         ftpServer: ftpServer,
-        onProgress: (progress) {
-          _setTransferProgress(
+        onProgress: (progress) async {
+          final snapshot = _setTransferProgress(
             title: 'Backup Progress',
             status: 'Uploading files to ${ftpServer.name}',
             currentFilePath: progress.currentFilePath,
@@ -140,6 +142,11 @@ class BackupJobNotifier extends StateNotifier<List<BackupJobModel>> {
             startedAt: _progressStartedAt ?? startedAt,
             active: true,
           );
+          if (foregroundStarted) {
+            await BackupForegroundServiceBridge.update(
+              message: snapshot.notificationMessage(),
+            );
+          }
         },
       );
     } catch (error) {
@@ -179,7 +186,7 @@ class BackupJobNotifier extends StateNotifier<List<BackupJobModel>> {
     return result;
   }
 
-  void _setTransferProgress({
+  TransferProgressSnapshot _setTransferProgress({
     required String title,
     required String status,
     required String currentFilePath,
@@ -189,7 +196,7 @@ class BackupJobNotifier extends StateNotifier<List<BackupJobModel>> {
     required DateTime startedAt,
     required bool active,
   }) {
-    _progressController.state = TransferProgressSnapshot(
+    final snapshot = TransferProgressSnapshot(
       title: title,
       status: status,
       currentFilePath: currentFilePath,
@@ -200,6 +207,8 @@ class BackupJobNotifier extends StateNotifier<List<BackupJobModel>> {
       updatedAt: DateTime.now(),
       active: active,
     );
+    _progressController.state = snapshot;
+    return snapshot;
   }
 
   BackupJobModel _completeJob(BackupJobModel job, BackupRunResult result) {

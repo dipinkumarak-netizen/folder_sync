@@ -72,6 +72,7 @@ File Picker
 - Backup Run Status Summary
 - Live Backup Transfer Status Bar
 - Backup Transfer Speed Display
+- Backup Notification Progress Details
 - Local Backup Job Persistence
 - Android Foreground Backup Permission Foundation
 - Android Data Sync Foreground Service Skeleton
@@ -99,6 +100,7 @@ File Picker
 - Foreground Sync Progress
 - Live Sync Transfer Status Bar
 - Sync Transfer Speed Display
+- Sync Notification Progress Details
 
 ## Restore Module
 
@@ -112,6 +114,7 @@ File Picker
 - Restore Filters
 - Restore Progress Details
 - Restore Transfer Speed Display
+- Restore Notification Progress Details
 - Restore Cancellation Support
 - Foreground Restore Progress
 - Restore History Logging

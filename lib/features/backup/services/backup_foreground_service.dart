@@ -40,4 +40,11 @@ class BackupForegroundServiceBridge {
       return;
     }
   }
+
+  static Future<void> update({
+    String title = 'OpenBackup',
+    required String message,
+  }) async {
+    await start(title: title, message: message);
+  }
 }

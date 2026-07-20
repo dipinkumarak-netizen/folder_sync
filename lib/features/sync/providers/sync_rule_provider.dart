@@ -129,8 +129,8 @@ class SyncRuleNotifier extends StateNotifier<List<SyncRuleModel>> {
       result = await _repository.runSync(
         rule: runningRule,
         ftpServer: ftpServer,
-        onProgress: (progress) {
-          _setTransferProgress(
+        onProgress: (progress) async {
+          final snapshot = _setTransferProgress(
             title: 'Sync Progress',
             status: '${_syncActionLabel(progress.action)} ${ftpServer.name}',
             currentFilePath: progress.currentFilePath,
@@ -139,6 +139,11 @@ class SyncRuleNotifier extends StateNotifier<List<SyncRuleModel>> {
             startedAt: _progressStartedAt ?? startedAt,
             active: true,
           );
+          if (foregroundStarted) {
+            await SyncForegroundServiceBridge.update(
+              message: snapshot.notificationMessage(),
+            );
+          }
         },
       );
     } catch (error) {
@@ -244,8 +249,8 @@ class SyncRuleNotifier extends StateNotifier<List<SyncRuleModel>> {
       result = await _repository.executeProtectedDeletes(
         rule: runningRule,
         ftpServer: ftpServer,
-        onProgress: (progress) {
-          _setTransferProgress(
+        onProgress: (progress) async {
+          final snapshot = _setTransferProgress(
             title: 'Sync Delete Progress',
             status: 'Deleting files',
             currentFilePath: progress.currentFilePath,
@@ -254,6 +259,11 @@ class SyncRuleNotifier extends StateNotifier<List<SyncRuleModel>> {
             startedAt: _progressStartedAt ?? startedAt,
             active: true,
           );
+          if (foregroundStarted) {
+            await SyncForegroundServiceBridge.update(
+              message: snapshot.notificationMessage(),
+            );
+          }
         },
       );
     } catch (error) {
@@ -291,7 +301,7 @@ class SyncRuleNotifier extends StateNotifier<List<SyncRuleModel>> {
     return result;
   }
 
-  void _setTransferProgress({
+  TransferProgressSnapshot _setTransferProgress({
     required String title,
     required String status,
     required String currentFilePath,
@@ -300,7 +310,7 @@ class SyncRuleNotifier extends StateNotifier<List<SyncRuleModel>> {
     required DateTime startedAt,
     required bool active,
   }) {
-    _progressController.state = TransferProgressSnapshot(
+    final snapshot = TransferProgressSnapshot(
       title: title,
       status: status,
       currentFilePath: currentFilePath,
@@ -311,6 +321,8 @@ class SyncRuleNotifier extends StateNotifier<List<SyncRuleModel>> {
       updatedAt: DateTime.now(),
       active: active,
     );
+    _progressController.state = snapshot;
+    return snapshot;
   }
 
   String _syncActionLabel(String action) {

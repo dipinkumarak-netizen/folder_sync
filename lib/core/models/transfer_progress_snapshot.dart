@@ -45,6 +45,17 @@ class TransferProgressSnapshot {
     return processedBytes / (elapsedMilliseconds / 1000);
   }
 
+  String notificationMessage() {
+    final count = totalFiles > 0
+        ? '$processedFiles/$totalFiles'
+        : '$processedFiles file(s)';
+    final speed = '${_formatBytes(averageBytesPerSecond.round())}/s LAN';
+    final file = currentFilePath.isEmpty
+        ? ''
+        : ' - ${_compactPath(currentFilePath)}';
+    return '$status - $count - $speed$file';
+  }
+
   TransferProgressSnapshot copyWith({
     String? title,
     String? status,
@@ -67,5 +78,31 @@ class TransferProgressSnapshot {
       updatedAt: updatedAt ?? this.updatedAt,
       active: active ?? this.active,
     );
+  }
+
+  static String _compactPath(String value) {
+    if (value.length <= 36) {
+      return value;
+    }
+
+    return '...${value.substring(value.length - 33)}';
+  }
+
+  static String _formatBytes(int bytes) {
+    if (bytes < 1024) {
+      return '$bytes B';
+    }
+
+    final kb = bytes / 1024;
+    if (kb < 1024) {
+      return '${kb.toStringAsFixed(1)} KB';
+    }
+
+    final mb = kb / 1024;
+    if (mb < 1024) {
+      return '${mb.toStringAsFixed(1)} MB';
+    }
+
+    return '${(mb / 1024).toStringAsFixed(1)} GB';
   }
 }
