@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:ftpconnect/ftpconnect.dart';
+import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
 import '../../core/utils/failure_message.dart';
@@ -173,6 +174,77 @@ class FtpMemoryRepository {
     }
   }
 
+  Future<FtpRemoteFolderListResult> listRemoteFolders({
+    required FtpServerModel server,
+    required String remotePath,
+  }) async {
+    final ftpConnect = FTPConnect(
+      server.host,
+      port: server.port,
+      user: server.isAnonymous ? 'anonymous' : server.username,
+      pass: server.isAnonymous ? '' : server.password,
+      timeout: 15,
+    );
+
+    var connected = false;
+    try {
+      connected = await ftpConnect.connect();
+      if (!connected) {
+        return const FtpRemoteFolderListResult(
+          success: false,
+          message: 'Could not connect to the FTP server.',
+          currentPath: '/',
+          folders: [],
+        );
+      }
+
+      final currentPath = _normalizeRemotePath(remotePath);
+      await _changeRemoteDirectory(ftpConnect, currentPath);
+      final entries = await ftpConnect.listDirectoryContent();
+      final folders =
+          entries
+              .where((entry) => entry.type == FTPEntryType.dir)
+              .map(
+                (entry) => FtpRemoteFolderEntry(
+                  name: entry.name,
+                  path: _joinRemotePath(currentPath, entry.name),
+                ),
+              )
+              .where(
+                (entry) =>
+                    entry.name.isNotEmpty &&
+                    entry.name != '.' &&
+                    entry.name != '..',
+              )
+              .toList()
+            ..sort((first, second) => first.name.compareTo(second.name));
+
+      return FtpRemoteFolderListResult(
+        success: true,
+        message: folders.isEmpty
+            ? 'No folders found in this remote folder.'
+            : 'Folders loaded.',
+        currentPath: currentPath,
+        folders: folders,
+      );
+    } catch (error) {
+      return FtpRemoteFolderListResult(
+        success: false,
+        message: FailureMessage.from(
+          error,
+          operation: 'Remote folder browser',
+          fallback: 'Could not list remote folders.',
+        ),
+        currentPath: _normalizeRemotePath(remotePath),
+        folders: const [],
+      );
+    } finally {
+      if (connected) {
+        await ftpConnect.disconnect();
+      }
+    }
+  }
+
   Future<File> _storageFile() async {
     final directory = await getApplicationDocumentsDirectory();
     final storageDirectory = Directory('${directory.path}/openbackup');
@@ -194,6 +266,52 @@ class FtpMemoryRepository {
       return;
     }
   }
+
+  String _normalizeRemotePath(String remotePath) {
+    final trimmed = remotePath.trim();
+    if (trimmed.isEmpty) {
+      return '/';
+    }
+
+    final normalized = path.posix.normalize(trimmed);
+    return normalized == '.' ? '/' : normalized;
+  }
+
+  String _joinRemotePath(String currentPath, String folderName) {
+    final safeName = folderName.trim();
+    if (currentPath == '/' || currentPath.isEmpty) {
+      return '/$safeName';
+    }
+
+    return path.posix.normalize(path.posix.join(currentPath, safeName));
+  }
+
+  Future<void> _changeRemoteDirectory(
+    FTPConnect ftpConnect,
+    String remotePath,
+  ) async {
+    final normalizedPath = _normalizeRemotePath(remotePath);
+    if (normalizedPath == '/' || normalizedPath == '.') {
+      await ftpConnect.changeDirectory('/');
+      return;
+    }
+
+    if (normalizedPath.startsWith('/')) {
+      await ftpConnect.changeDirectory('/');
+    }
+
+    final parts = normalizedPath
+        .split('/')
+        .where((part) => part.isNotEmpty && part != '.')
+        .toList();
+
+    for (final part in parts) {
+      final changed = await ftpConnect.changeDirectory(part);
+      if (!changed) {
+        throw StateError('Could not open remote folder $part.');
+      }
+    }
+  }
 }
 
 class FtpConnectionTestResult {
@@ -201,4 +319,25 @@ class FtpConnectionTestResult {
   final String message;
 
   const FtpConnectionTestResult({required this.success, required this.message});
+}
+
+class FtpRemoteFolderEntry {
+  final String name;
+  final String path;
+
+  const FtpRemoteFolderEntry({required this.name, required this.path});
+}
+
+class FtpRemoteFolderListResult {
+  final bool success;
+  final String message;
+  final String currentPath;
+  final List<FtpRemoteFolderEntry> folders;
+
+  const FtpRemoteFolderListResult({
+    required this.success,
+    required this.message,
+    required this.currentPath,
+    required this.folders,
+  });
 }

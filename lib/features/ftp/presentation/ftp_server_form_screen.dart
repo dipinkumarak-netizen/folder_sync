@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
+import '../../repositories/ftp_memory_repository.dart';
 import '../models/ftp_server_model.dart';
 import '../providers/ftp_provider.dart';
 
@@ -37,6 +38,7 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
   bool _anonymousLogin = false;
   bool _showPassword = false;
   bool _isTestingConnection = false;
+  bool _isSelectingRemoteFolder = false;
 
   bool get _isEditing => widget.server != null;
 
@@ -146,6 +148,37 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
     );
   }
 
+  Future<void> _selectRemoteFolder() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() {
+      _isSelectingRemoteFolder = true;
+    });
+
+    final selectedPath = await showDialog<String>(
+      context: context,
+      builder: (context) => _RemoteFolderPickerDialog(
+        server: _buildServerFromForm(),
+        initialPath: _remotePathController.text.trim().isEmpty
+            ? '/'
+            : _remotePathController.text.trim(),
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isSelectingRemoteFolder = false;
+      if (selectedPath != null) {
+        _remotePathController.text = selectedPath;
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -229,7 +262,23 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
               const SizedBox(height: AppSizes.paddingM),
               TextFormField(
                 controller: _remotePathController,
-                decoration: _inputDecoration("Remote Folder", Icons.folder),
+                decoration: _inputDecoration("Remote Folder", Icons.folder)
+                    .copyWith(
+                      suffixIcon: IconButton(
+                        tooltip: 'Select Remote Folder',
+                        onPressed: _isSelectingRemoteFolder
+                            ? null
+                            : _selectRemoteFolder,
+                        icon: _isSelectingRemoteFolder
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.folder_open_rounded),
+                      ),
+                    ),
               ),
               const SizedBox(height: AppSizes.paddingM),
               SwitchListTile(
@@ -268,6 +317,222 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _RemoteFolderPickerDialog extends ConsumerStatefulWidget {
+  const _RemoteFolderPickerDialog({
+    required this.server,
+    required this.initialPath,
+  });
+
+  final FtpServerModel server;
+  final String initialPath;
+
+  @override
+  ConsumerState<_RemoteFolderPickerDialog> createState() =>
+      _RemoteFolderPickerDialogState();
+}
+
+class _RemoteFolderPickerDialogState
+    extends ConsumerState<_RemoteFolderPickerDialog> {
+  var _currentPath = '/';
+  var _isLoading = true;
+  FtpRemoteFolderListResult? _result;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentPath = _normalizeRemotePath(widget.initialPath);
+    _loadFolders(_currentPath);
+  }
+
+  Future<void> _loadFolders(String remotePath) async {
+    setState(() {
+      _currentPath = _normalizeRemotePath(remotePath);
+      _isLoading = true;
+    });
+
+    final result = await ref
+        .read(ftpServerProvider.notifier)
+        .listRemoteFolders(server: widget.server, remotePath: _currentPath);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _result = result;
+      _currentPath = result.currentPath;
+      _isLoading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final result = _result;
+
+    return AlertDialog(
+      title: const Text('Select Remote Folder'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _currentPath,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.textHint),
+            ),
+            const SizedBox(height: AppSizes.paddingM),
+            Flexible(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : result == null || !result.success
+                  ? _RemoteFolderError(
+                      message: result?.message ?? 'Could not load folders.',
+                      onRetry: () => _loadFolders(_currentPath),
+                    )
+                  : _RemoteFolderList(
+                      currentPath: _currentPath,
+                      folders: result.folders,
+                      onOpenParent: _canOpenParent
+                          ? () => _loadFolders(_parentPath(_currentPath))
+                          : null,
+                      onOpenFolder: (folder) => _loadFolders(folder.path),
+                    ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _isLoading
+              ? null
+              : () => Navigator.pop(context, _currentPath),
+          child: const Text('Select Folder'),
+        ),
+      ],
+    );
+  }
+
+  bool get _canOpenParent => _currentPath != '/';
+
+  String _normalizeRemotePath(String remotePath) {
+    final trimmed = remotePath.trim();
+    if (trimmed.isEmpty || trimmed == '.') {
+      return '/';
+    }
+
+    final normalized = trimmed.replaceAll(RegExp(r'/+'), '/');
+    if (normalized == '/') {
+      return '/';
+    }
+
+    return normalized.endsWith('/')
+        ? normalized.substring(0, normalized.length - 1)
+        : normalized;
+  }
+
+  String _parentPath(String remotePath) {
+    final normalized = _normalizeRemotePath(remotePath);
+    if (normalized == '/') {
+      return '/';
+    }
+
+    final parts = normalized.split('/').where((part) => part.isNotEmpty);
+    final parentParts = parts.take(parts.length - 1).toList();
+    if (parentParts.isEmpty) {
+      return '/';
+    }
+
+    return '/${parentParts.join('/')}';
+  }
+}
+
+class _RemoteFolderList extends StatelessWidget {
+  const _RemoteFolderList({
+    required this.currentPath,
+    required this.folders,
+    required this.onOpenParent,
+    required this.onOpenFolder,
+  });
+
+  final String currentPath;
+  final List<FtpRemoteFolderEntry> folders;
+  final VoidCallback? onOpenParent;
+  final ValueChanged<FtpRemoteFolderEntry> onOpenFolder;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: 360),
+      child: ListView(
+        shrinkWrap: true,
+        children: [
+          if (onOpenParent != null)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.drive_folder_upload_rounded),
+              title: const Text('Parent Folder'),
+              onTap: onOpenParent,
+            ),
+          if (folders.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSizes.paddingL),
+              child: Text(
+                'No folders found here.',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: AppColors.textHint),
+              ),
+            ),
+          ...folders.map(
+            (folder) => ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.folder_rounded),
+              title: Text(folder.name),
+              subtitle: Text(folder.path),
+              onTap: () => onOpenFolder(folder),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RemoteFolderError extends StatelessWidget {
+  const _RemoteFolderError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          message,
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: AppColors.textHint),
+        ),
+        const SizedBox(height: AppSizes.paddingM),
+        OutlinedButton.icon(
+          onPressed: onRetry,
+          icon: const Icon(Icons.refresh_rounded),
+          label: const Text('Retry'),
+        ),
+      ],
     );
   }
 }

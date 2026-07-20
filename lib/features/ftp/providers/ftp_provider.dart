@@ -59,6 +59,16 @@ class FtpServerNotifier extends StateNotifier<List<FtpServerModel>> {
   ) {
     return _repository.testConnectionDetailed(server);
   }
+
+  Future<FtpRemoteFolderListResult> listRemoteFolders({
+    required FtpServerModel server,
+    required String remotePath,
+  }) {
+    return _repository.listRemoteFolders(
+      server: server,
+      remotePath: remotePath,
+    );
+  }
 }
 
 final ftpServerProvider =

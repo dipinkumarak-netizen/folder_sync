@@ -59,6 +59,7 @@ File Picker
 - FTP Provider
 - FTP Connection Testing
 - FTP Connection Failure Details
+- Remote Folder Picker
 - Local FTP Server Persistence
 
 ## Backup Module
