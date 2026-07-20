@@ -46,6 +46,23 @@ class SyncRunFileReport {
   });
 }
 
+class SyncProgressUpdate {
+  final String currentFilePath;
+  final String action;
+  final int filesChanged;
+  final int bytesChanged;
+
+  const SyncProgressUpdate({
+    required this.currentFilePath,
+    required this.action,
+    required this.filesChanged,
+    required this.bytesChanged,
+  });
+}
+
+typedef SyncProgressCallback =
+    FutureOr<void> Function(SyncProgressUpdate update);
+
 enum SyncDeleteTarget { local, remote }
 
 class SyncDeletePreviewItem {
@@ -175,6 +192,7 @@ class SyncRuleRepository {
   Future<SyncRunResult> runSync({
     required SyncRuleModel rule,
     required FtpServerModel ftpServer,
+    SyncProgressCallback? onProgress,
   }) async {
     final localDirectory = Directory(rule.localFolderPath);
     if (!await localDirectory.exists()) {
@@ -237,6 +255,7 @@ class SyncRuleRepository {
           localFiles: localFiles,
           remoteFiles: remoteFiles,
           rule: rule,
+          onProgress: onProgress,
         );
         filesChanged += result.filesChanged;
         bytesChanged += result.bytesChanged;
@@ -251,6 +270,9 @@ class SyncRuleRepository {
           localFiles: localFiles,
           remoteFiles: remoteFiles,
           rule: rule,
+          initialFilesChanged: filesChanged,
+          initialBytesChanged: bytesChanged,
+          onProgress: onProgress,
         );
         filesChanged += result.filesChanged;
         bytesChanged += result.bytesChanged;
@@ -375,6 +397,7 @@ class SyncRuleRepository {
   Future<SyncRunResult> executeProtectedDeletes({
     required SyncRuleModel rule,
     required FtpServerModel ftpServer,
+    SyncProgressCallback? onProgress,
   }) async {
     final localDirectory = Directory(rule.localFolderPath);
     if (!await localDirectory.exists()) {
@@ -457,6 +480,14 @@ class SyncRuleRepository {
             size: item.size,
           ),
         );
+        await onProgress?.call(
+          SyncProgressUpdate(
+            currentFilePath: item.relativePath,
+            action: 'delete',
+            filesChanged: filesChanged,
+            bytesChanged: bytesChanged,
+          ),
+        );
       }
 
       return SyncRunResult(
@@ -503,6 +534,7 @@ class SyncRuleRepository {
     required Map<String, _SyncFileEntry> localFiles,
     required Map<String, _SyncFileEntry> remoteFiles,
     required SyncRuleModel rule,
+    SyncProgressCallback? onProgress,
   }) async {
     var filesChanged = 0;
     var bytesChanged = 0;
@@ -550,6 +582,14 @@ class SyncRuleRepository {
           size: localEntry.size,
         ),
       );
+      await onProgress?.call(
+        SyncProgressUpdate(
+          currentFilePath: uploadName,
+          action: 'upload',
+          filesChanged: filesChanged,
+          bytesChanged: bytesChanged,
+        ),
+      );
     }
 
     return SyncRunResult(
@@ -568,6 +608,9 @@ class SyncRuleRepository {
     required Map<String, _SyncFileEntry> localFiles,
     required Map<String, _SyncFileEntry> remoteFiles,
     required SyncRuleModel rule,
+    required int initialFilesChanged,
+    required int initialBytesChanged,
+    SyncProgressCallback? onProgress,
   }) async {
     var filesChanged = 0;
     var bytesChanged = 0;
@@ -613,6 +656,14 @@ class SyncRuleRepository {
           relativePath: remoteEntry.relativePath,
           action: 'download',
           size: remoteEntry.size,
+        ),
+      );
+      await onProgress?.call(
+        SyncProgressUpdate(
+          currentFilePath: remoteEntry.relativePath,
+          action: 'download',
+          filesChanged: initialFilesChanged + filesChanged,
+          bytesChanged: initialBytesChanged + bytesChanged,
         ),
       );
     }

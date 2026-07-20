@@ -5,6 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_icons.dart';
 import '../../../core/constants/app_sizes.dart';
+import '../../../core/widgets/transfer_status_bar.dart';
 import '../../../core/widgets/ob_card.dart';
 import '../../ftp/models/ftp_server_model.dart';
 import '../../ftp/presentation/ftp_server_list_screen.dart';
@@ -37,6 +38,7 @@ class BackupJobListScreen extends ConsumerWidget {
     ref.watch(ftpServerLoadProvider);
     final jobs = ref.watch(backupJobProvider);
     final ftpServers = ref.watch(ftpServerProvider);
+    final transferProgress = ref.watch(backupTransferProgressProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -51,6 +53,10 @@ class BackupJobListScreen extends ConsumerWidget {
               padding: const EdgeInsets.all(AppSizes.paddingM),
               children: [
                 const _ForegroundReadinessCard(),
+                if (transferProgress?.active == true) ...[
+                  const SizedBox(height: AppSizes.paddingM),
+                  TransferStatusBar(progress: transferProgress!),
+                ],
                 const SizedBox(height: AppSizes.paddingM),
                 _EmptyBackupJobs(hasFtpServers: ftpServers.isNotEmpty),
               ],
@@ -62,7 +68,15 @@ class BackupJobListScreen extends ConsumerWidget {
                   const SizedBox(height: AppSizes.paddingM),
               itemBuilder: (context, index) {
                 if (index == 0) {
-                  return const _ForegroundReadinessCard();
+                  return Column(
+                    children: [
+                      const _ForegroundReadinessCard(),
+                      if (transferProgress?.active == true) ...[
+                        const SizedBox(height: AppSizes.paddingM),
+                        TransferStatusBar(progress: transferProgress!),
+                      ],
+                    ],
+                  );
                 }
 
                 final job = jobs[index - 1];

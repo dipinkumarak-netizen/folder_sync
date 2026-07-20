@@ -2,6 +2,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../../core/models/transfer_progress_snapshot.dart';
 import '../../../core/utils/failure_message.dart';
 import '../../ftp/models/ftp_server_model.dart';
 import '../../history/models/history_entry_model.dart';
@@ -24,13 +25,23 @@ final backupRepositoryProvider = Provider<BackupMemoryRepository>((ref) {
   return BackupMemoryRepository.instance;
 });
 
+final backupTransferProgressProvider = StateProvider<TransferProgressSnapshot?>(
+  (ref) => null,
+);
+
 class BackupJobNotifier extends StateNotifier<List<BackupJobModel>> {
-  BackupJobNotifier(this._repository, this._historyNotifier, this._readSettings)
-    : super(_repository.getAll().toList());
+  BackupJobNotifier(
+    this._repository,
+    this._historyNotifier,
+    this._progressController,
+    this._readSettings,
+  ) : super(_repository.getAll().toList());
 
   final BackupMemoryRepository _repository;
   final HistoryNotifier _historyNotifier;
+  final StateController<TransferProgressSnapshot?> _progressController;
   final AppSettingsModel Function() _readSettings;
+  DateTime? _progressStartedAt;
 
   void refresh() {
     state = _repository.getAll().toList();
@@ -94,6 +105,18 @@ class BackupJobNotifier extends StateNotifier<List<BackupJobModel>> {
       lastMessage: 'Backup is running...',
     );
     _repository.update(runningJob);
+    final startedAt = DateTime.now();
+    _progressStartedAt = startedAt;
+    _setTransferProgress(
+      title: 'Backup Progress',
+      status: 'Preparing backup files...',
+      currentFilePath: '',
+      processedFiles: 0,
+      totalFiles: 0,
+      processedBytes: 0,
+      startedAt: startedAt,
+      active: true,
+    );
     refresh();
 
     var foregroundStarted = false;
@@ -106,6 +129,18 @@ class BackupJobNotifier extends StateNotifier<List<BackupJobModel>> {
       result = await _repository.runBackup(
         job: runningJob,
         ftpServer: ftpServer,
+        onProgress: (progress) {
+          _setTransferProgress(
+            title: 'Backup Progress',
+            status: 'Uploading files to ${ftpServer.name}',
+            currentFilePath: progress.currentFilePath,
+            processedFiles: progress.currentFileIndex,
+            totalFiles: progress.totalFiles,
+            processedBytes: progress.bytesBackedUp,
+            startedAt: _progressStartedAt ?? startedAt,
+            active: true,
+          );
+        },
       );
     } catch (error) {
       result = BackupRunResult(
@@ -129,8 +164,42 @@ class BackupJobNotifier extends StateNotifier<List<BackupJobModel>> {
     _repository.update(completedJob);
     await _writeHistory(completedJob, ftpServer, result);
     refresh();
+    _setTransferProgress(
+      title: 'Backup Progress',
+      status: result.message,
+      currentFilePath: '',
+      processedFiles: result.filesBackedUp,
+      totalFiles: result.filesBackedUp,
+      processedBytes: result.bytesBackedUp,
+      startedAt: _progressStartedAt ?? startedAt,
+      active: false,
+    );
+    _progressStartedAt = null;
 
     return result;
+  }
+
+  void _setTransferProgress({
+    required String title,
+    required String status,
+    required String currentFilePath,
+    required int processedFiles,
+    required int totalFiles,
+    required int processedBytes,
+    required DateTime startedAt,
+    required bool active,
+  }) {
+    _progressController.state = TransferProgressSnapshot(
+      title: title,
+      status: status,
+      currentFilePath: currentFilePath,
+      processedFiles: processedFiles,
+      totalFiles: totalFiles,
+      processedBytes: processedBytes,
+      startedAt: startedAt,
+      updatedAt: DateTime.now(),
+      active: active,
+    );
   }
 
   BackupJobModel _completeJob(BackupJobModel job, BackupRunResult result) {
@@ -265,9 +334,13 @@ final backupJobProvider =
     StateNotifierProvider<BackupJobNotifier, List<BackupJobModel>>((ref) {
       final repository = ref.watch(backupRepositoryProvider);
       final historyNotifier = ref.watch(historyProvider.notifier);
+      final progressController = ref.watch(
+        backupTransferProgressProvider.notifier,
+      );
       return BackupJobNotifier(
         repository,
         historyNotifier,
+        progressController,
         () => ref.read(appSettingsProvider),
       );
     });

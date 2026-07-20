@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_icons.dart';
 import '../../../core/constants/app_sizes.dart';
+import '../../../core/models/transfer_progress_snapshot.dart';
+import '../../../core/widgets/transfer_status_bar.dart';
 import '../../../core/widgets/ob_card.dart';
 import '../../ftp/models/ftp_server_model.dart';
 import '../../ftp/presentation/ftp_server_list_screen.dart';
@@ -193,6 +195,12 @@ class _RestoreScreenState extends ConsumerState<RestoreScreen> {
             padding: const EdgeInsets.all(AppSizes.paddingM),
             children: [
               _RestoreOverview(state: restoreState),
+              if (_restoreTransferProgress(restoreState) != null) ...[
+                const SizedBox(height: AppSizes.paddingM),
+                TransferStatusBar(
+                  progress: _restoreTransferProgress(restoreState)!,
+                ),
+              ],
               const SizedBox(height: AppSizes.paddingM),
               _RestoreFormCard(
                 ftpServers: ftpServers,
@@ -344,6 +352,26 @@ class _RestoreScreenState extends ConsumerState<RestoreScreen> {
       maxFileSizeMb: maxFileSizeText.isEmpty
           ? null
           : int.parse(maxFileSizeText),
+    );
+  }
+
+  TransferProgressSnapshot? _restoreTransferProgress(RestoreState state) {
+    if (state.status != RestoreStatus.running &&
+        state.status != RestoreStatus.cancelling) {
+      return null;
+    }
+
+    final now = DateTime.now();
+    return TransferProgressSnapshot(
+      title: 'Restore Progress',
+      status: state.message,
+      currentFilePath: state.currentFilePath,
+      processedFiles: state.currentFileIndex,
+      totalFiles: state.totalFiles,
+      processedBytes: state.lastBytesRestored,
+      startedAt: state.transferStartedAt ?? now,
+      updatedAt: state.transferUpdatedAt ?? now,
+      active: true,
     );
   }
 }

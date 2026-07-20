@@ -2,6 +2,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../../core/models/transfer_progress_snapshot.dart';
 import '../../../core/utils/failure_message.dart';
 import '../../ftp/models/ftp_server_model.dart';
 import '../../history/models/history_entry_model.dart';
@@ -24,13 +25,23 @@ final syncRuleRepositoryProvider = Provider<SyncRuleRepository>((ref) {
   return SyncRuleRepository.instance;
 });
 
+final syncTransferProgressProvider = StateProvider<TransferProgressSnapshot?>(
+  (ref) => null,
+);
+
 class SyncRuleNotifier extends StateNotifier<List<SyncRuleModel>> {
-  SyncRuleNotifier(this._repository, this._historyNotifier, this._readSettings)
-    : super(_repository.getAll().toList());
+  SyncRuleNotifier(
+    this._repository,
+    this._historyNotifier,
+    this._progressController,
+    this._readSettings,
+  ) : super(_repository.getAll().toList());
 
   final SyncRuleRepository _repository;
   final HistoryNotifier _historyNotifier;
+  final StateController<TransferProgressSnapshot?> _progressController;
   final AppSettingsModel Function() _readSettings;
+  DateTime? _progressStartedAt;
 
   void refresh() {
     state = _repository.getAll().toList();
@@ -93,6 +104,17 @@ class SyncRuleNotifier extends StateNotifier<List<SyncRuleModel>> {
       lastMessage: 'Synchronization is running...',
     );
     _repository.update(runningRule);
+    final startedAt = DateTime.now();
+    _progressStartedAt = startedAt;
+    _setTransferProgress(
+      title: 'Sync Progress',
+      status: 'Scanning local and remote files...',
+      currentFilePath: '',
+      processedFiles: 0,
+      processedBytes: 0,
+      startedAt: startedAt,
+      active: true,
+    );
     refresh();
 
     var foregroundStarted = false;
@@ -107,6 +129,17 @@ class SyncRuleNotifier extends StateNotifier<List<SyncRuleModel>> {
       result = await _repository.runSync(
         rule: runningRule,
         ftpServer: ftpServer,
+        onProgress: (progress) {
+          _setTransferProgress(
+            title: 'Sync Progress',
+            status: '${_syncActionLabel(progress.action)} ${ftpServer.name}',
+            currentFilePath: progress.currentFilePath,
+            processedFiles: progress.filesChanged,
+            processedBytes: progress.bytesChanged,
+            startedAt: _progressStartedAt ?? startedAt,
+            active: true,
+          );
+        },
       );
     } catch (error) {
       result = SyncRunResult(
@@ -129,6 +162,16 @@ class SyncRuleNotifier extends StateNotifier<List<SyncRuleModel>> {
     _repository.update(completedRule);
     await _writeHistory(completedRule, ftpServer, result);
     refresh();
+    _setTransferProgress(
+      title: 'Sync Progress',
+      status: result.message,
+      currentFilePath: '',
+      processedFiles: result.filesChanged,
+      processedBytes: result.bytesChanged,
+      startedAt: _progressStartedAt ?? startedAt,
+      active: false,
+    );
+    _progressStartedAt = null;
 
     return result;
   }
@@ -176,6 +219,17 @@ class SyncRuleNotifier extends StateNotifier<List<SyncRuleModel>> {
       lastMessage: 'Protected deletes are running...',
     );
     _repository.update(runningRule);
+    final startedAt = DateTime.now();
+    _progressStartedAt = startedAt;
+    _setTransferProgress(
+      title: 'Sync Delete Progress',
+      status: 'Deleting confirmed files...',
+      currentFilePath: '',
+      processedFiles: 0,
+      processedBytes: 0,
+      startedAt: startedAt,
+      active: true,
+    );
     refresh();
 
     var foregroundStarted = false;
@@ -190,6 +244,17 @@ class SyncRuleNotifier extends StateNotifier<List<SyncRuleModel>> {
       result = await _repository.executeProtectedDeletes(
         rule: runningRule,
         ftpServer: ftpServer,
+        onProgress: (progress) {
+          _setTransferProgress(
+            title: 'Sync Delete Progress',
+            status: 'Deleting files',
+            currentFilePath: progress.currentFilePath,
+            processedFiles: progress.filesChanged,
+            processedBytes: progress.bytesChanged,
+            startedAt: _progressStartedAt ?? startedAt,
+            active: true,
+          );
+        },
       );
     } catch (error) {
       result = SyncRunResult(
@@ -212,8 +277,49 @@ class SyncRuleNotifier extends StateNotifier<List<SyncRuleModel>> {
     _repository.update(completedRule);
     await _writeHistory(completedRule, ftpServer, result);
     refresh();
+    _setTransferProgress(
+      title: 'Sync Delete Progress',
+      status: result.message,
+      currentFilePath: '',
+      processedFiles: result.filesChanged,
+      processedBytes: result.bytesChanged,
+      startedAt: _progressStartedAt ?? startedAt,
+      active: false,
+    );
+    _progressStartedAt = null;
 
     return result;
+  }
+
+  void _setTransferProgress({
+    required String title,
+    required String status,
+    required String currentFilePath,
+    required int processedFiles,
+    required int processedBytes,
+    required DateTime startedAt,
+    required bool active,
+  }) {
+    _progressController.state = TransferProgressSnapshot(
+      title: title,
+      status: status,
+      currentFilePath: currentFilePath,
+      processedFiles: processedFiles,
+      totalFiles: 0,
+      processedBytes: processedBytes,
+      startedAt: startedAt,
+      updatedAt: DateTime.now(),
+      active: active,
+    );
+  }
+
+  String _syncActionLabel(String action) {
+    return switch (action) {
+      'upload' => 'Uploading to',
+      'download' => 'Downloading from',
+      'delete' => 'Deleting on',
+      _ => 'Syncing with',
+    };
   }
 
   SyncRuleModel _completeRule(SyncRuleModel rule, SyncRunResult result) {
@@ -339,9 +445,13 @@ final syncRuleProvider =
     StateNotifierProvider<SyncRuleNotifier, List<SyncRuleModel>>((ref) {
       final repository = ref.watch(syncRuleRepositoryProvider);
       final historyNotifier = ref.watch(historyProvider.notifier);
+      final progressController = ref.watch(
+        syncTransferProgressProvider.notifier,
+      );
       return SyncRuleNotifier(
         repository,
         historyNotifier,
+        progressController,
         () => ref.read(appSettingsProvider),
       );
     });

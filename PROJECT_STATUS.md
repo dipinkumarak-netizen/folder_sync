@@ -70,6 +70,8 @@ File Picker
 - Remote Folder Picker
 - Manual New-Files-Only FTP Backup
 - Backup Run Status Summary
+- Live Backup Transfer Status Bar
+- Backup Transfer Speed Display
 - Local Backup Job Persistence
 - Android Foreground Backup Permission Foundation
 - Android Data Sync Foreground Service Skeleton
@@ -95,6 +97,8 @@ File Picker
 - Protected Delete Preview Screen
 - Confirmed Delete Rule Execution
 - Foreground Sync Progress
+- Live Sync Transfer Status Bar
+- Sync Transfer Speed Display
 
 ## Restore Module
 
@@ -107,6 +111,7 @@ File Picker
 - Restore Local Conflict Preview
 - Restore Filters
 - Restore Progress Details
+- Restore Transfer Speed Display
 - Restore Cancellation Support
 - Foreground Restore Progress
 - Restore History Logging

@@ -36,6 +36,25 @@ class BackupRunResult {
   });
 }
 
+class BackupProgressUpdate {
+  final int currentFileIndex;
+  final int totalFiles;
+  final String currentFilePath;
+  final int filesBackedUp;
+  final int bytesBackedUp;
+
+  const BackupProgressUpdate({
+    required this.currentFileIndex,
+    required this.totalFiles,
+    required this.currentFilePath,
+    required this.filesBackedUp,
+    required this.bytesBackedUp,
+  });
+}
+
+typedef BackupProgressCallback =
+    FutureOr<void> Function(BackupProgressUpdate update);
+
 class BackupMemoryRepository {
   BackupMemoryRepository._();
 
@@ -117,6 +136,7 @@ class BackupMemoryRepository {
   Future<BackupRunResult> runBackup({
     required BackupJobModel job,
     required FtpServerModel ftpServer,
+    BackupProgressCallback? onProgress,
   }) async {
     final localDirectory = Directory(job.localFolderPath);
     if (!await localDirectory.exists()) {
@@ -185,8 +205,10 @@ class BackupMemoryRepository {
       final remoteRoot = _normalizeRemotePath(job.remoteFolderPath);
       await _changeOrCreateRemoteDirectory(ftpConnect, remoteRoot);
 
-      for (final file in pendingFiles) {
+      for (var index = 0; index < pendingFiles.length; index += 1) {
+        final file = pendingFiles[index];
         final relativePath = _relativeFilePath(localDirectory.path, file.path);
+        final fileLength = await file.length();
         final remoteDirectory = path.posix.dirname(relativePath);
         await _changeOrCreateRemoteDirectory(ftpConnect, remoteRoot);
         if (remoteDirectory != '.') {
@@ -211,7 +233,16 @@ class BackupMemoryRepository {
         backedUpPaths.add(relativePath);
         runBackedUpPaths.add(relativePath);
         filesBackedUp += 1;
-        bytesBackedUp += await file.length();
+        bytesBackedUp += fileLength;
+        await onProgress?.call(
+          BackupProgressUpdate(
+            currentFileIndex: index + 1,
+            totalFiles: pendingFiles.length,
+            currentFilePath: relativePath,
+            filesBackedUp: filesBackedUp,
+            bytesBackedUp: bytesBackedUp,
+          ),
+        );
       }
 
       return BackupRunResult(

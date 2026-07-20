@@ -41,6 +41,8 @@ class RestoreState {
   final int lastFilesOverwritten;
   final int lastFilesKeptBoth;
   final int lastBytesRestored;
+  final DateTime? transferStartedAt;
+  final DateTime? transferUpdatedAt;
 
   const RestoreState({
     this.status = RestoreStatus.idle,
@@ -56,6 +58,8 @@ class RestoreState {
     this.lastFilesOverwritten = 0,
     this.lastFilesKeptBoth = 0,
     this.lastBytesRestored = 0,
+    this.transferStartedAt,
+    this.transferUpdatedAt,
   });
 
   RestoreState copyWith({
@@ -72,6 +76,8 @@ class RestoreState {
     int? lastFilesOverwritten,
     int? lastFilesKeptBoth,
     int? lastBytesRestored,
+    DateTime? transferStartedAt,
+    DateTime? transferUpdatedAt,
   }) {
     return RestoreState(
       status: status ?? this.status,
@@ -87,6 +93,8 @@ class RestoreState {
       lastFilesOverwritten: lastFilesOverwritten ?? this.lastFilesOverwritten,
       lastFilesKeptBoth: lastFilesKeptBoth ?? this.lastFilesKeptBoth,
       lastBytesRestored: lastBytesRestored ?? this.lastBytesRestored,
+      transferStartedAt: transferStartedAt ?? this.transferStartedAt,
+      transferUpdatedAt: transferUpdatedAt ?? this.transferUpdatedAt,
     );
   }
 }
@@ -214,6 +222,8 @@ class RestoreNotifier extends StateNotifier<RestoreState> {
       totalFiles: state.conflictPreview.filesToRestore,
       currentFilePath: '',
       cancelRequested: false,
+      transferStartedAt: DateTime.now(),
+      transferUpdatedAt: DateTime.now(),
     );
     final cancellationToken = RestoreCancellationToken();
     _activeCancellationToken = cancellationToken;
@@ -251,6 +261,7 @@ class RestoreNotifier extends StateNotifier<RestoreState> {
             lastFilesKeptBoth: progress.filesKeptBoth,
             lastBytesRestored: progress.bytesRestored,
             cancelRequested: cancellationToken.isCancelled,
+            transferUpdatedAt: DateTime.now(),
           );
 
           if (foregroundStarted) {
@@ -295,6 +306,7 @@ class RestoreNotifier extends StateNotifier<RestoreState> {
       lastFilesOverwritten: result.filesOverwritten,
       lastFilesKeptBoth: result.filesKeptBoth,
       lastBytesRestored: result.bytesRestored,
+      transferUpdatedAt: DateTime.now(),
     );
     await _writeHistory(
       ftpServer: ftpServer,

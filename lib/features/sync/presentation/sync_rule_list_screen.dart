@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_icons.dart';
 import '../../../core/constants/app_sizes.dart';
+import '../../../core/widgets/transfer_status_bar.dart';
 import '../../../core/widgets/ob_card.dart';
 import '../../ftp/models/ftp_server_model.dart';
 import '../../ftp/presentation/ftp_server_list_screen.dart';
@@ -36,6 +37,7 @@ class SyncRuleListScreen extends ConsumerWidget {
     ref.watch(ftpServerLoadProvider);
     final rules = ref.watch(syncRuleProvider);
     final ftpServers = ref.watch(ftpServerProvider);
+    final transferProgress = ref.watch(syncTransferProgressProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -50,6 +52,10 @@ class SyncRuleListScreen extends ConsumerWidget {
               padding: const EdgeInsets.all(AppSizes.paddingM),
               children: [
                 _SyncRulesOverview(hasFtpServers: ftpServers.isNotEmpty),
+                if (transferProgress?.active == true) ...[
+                  const SizedBox(height: AppSizes.paddingM),
+                  TransferStatusBar(progress: transferProgress!),
+                ],
                 const SizedBox(height: AppSizes.paddingM),
                 _EmptySyncRules(hasFtpServers: ftpServers.isNotEmpty),
               ],
@@ -61,8 +67,14 @@ class SyncRuleListScreen extends ConsumerWidget {
                   const SizedBox(height: AppSizes.paddingM),
               itemBuilder: (context, index) {
                 if (index == 0) {
-                  return _SyncRulesOverview(
-                    hasFtpServers: ftpServers.isNotEmpty,
+                  return Column(
+                    children: [
+                      _SyncRulesOverview(hasFtpServers: ftpServers.isNotEmpty),
+                      if (transferProgress?.active == true) ...[
+                        const SizedBox(height: AppSizes.paddingM),
+                        TransferStatusBar(progress: transferProgress!),
+                      ],
+                    ],
                   );
                 }
 
