@@ -154,8 +154,7 @@ class FtpMemoryRepository {
       // Some modems/routers land the user in a specific folder. 
       // Let's check where we are.
       try {
-        final currentDir = await ftpConnect.currentDirectory();
-        // If we want to log this or use it, we could.
+        await ftpConnect.currentDirectory();
       } catch (_) {}
 
       final remotePath = server.remotePath.trim();
