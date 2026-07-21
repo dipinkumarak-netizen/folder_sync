@@ -40,6 +40,8 @@ class _BackupJobFormScreenState extends ConsumerState<BackupJobFormScreen> {
   String? _selectedFtpServerId;
   bool _enabled = true;
   bool _runOnWifiOnly = true;
+  bool _runOnlyWhileCharging = false;
+  bool _compressBeforeUpload = false;
   bool _appliedSettingsDefaults = false;
   BackupScheduleRule _scheduleRule = BackupScheduleRule.manualOnly;
 
@@ -60,6 +62,8 @@ class _BackupJobFormScreenState extends ConsumerState<BackupJobFormScreen> {
     _selectedFtpServerId = job.ftpServerId;
     _enabled = job.enabled;
     _runOnWifiOnly = job.runOnWifiOnly;
+    _runOnlyWhileCharging = job.runOnlyWhileCharging;
+    _compressBeforeUpload = job.compressBeforeUpload;
     _homeWifiController.text = job.homeWifiName;
     _scheduleRule = job.scheduleRule;
   }
@@ -113,6 +117,8 @@ class _BackupJobFormScreenState extends ConsumerState<BackupJobFormScreen> {
       enabled: _enabled,
       scheduleRule: _scheduleRule,
       runOnWifiOnly: _runOnWifiOnly,
+      runOnlyWhileCharging: _runOnlyWhileCharging,
+      compressBeforeUpload: _compressBeforeUpload,
       homeWifiName: _homeWifiController.text.trim(),
       status: existingJob?.status ?? BackupJobStatus.idle,
       lastRunAt: existingJob?.lastRunAt,
@@ -238,6 +244,27 @@ class _BackupJobFormScreenState extends ConsumerState<BackupJobFormScreen> {
                 onChanged: (value) {
                   setState(() {
                     _runOnWifiOnly = value;
+                  });
+                },
+              ),
+              const SizedBox(height: AppSizes.paddingM),
+              SwitchListTile(
+                value: _runOnlyWhileCharging,
+                title: const Text('Run Only While Charging'),
+                subtitle: const Text('Backup will wait until device is plugged in.'),
+                onChanged: (value) {
+                  setState(() {
+                    _runOnlyWhileCharging = value;
+                  });
+                },
+              ),
+              SwitchListTile(
+                value: _compressBeforeUpload,
+                title: const Text('Compress Before Upload'),
+                subtitle: const Text('Reduces data usage by zipping files.'),
+                onChanged: (value) {
+                  setState(() {
+                    _compressBeforeUpload = value;
                   });
                 },
               ),

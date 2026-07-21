@@ -5,6 +5,8 @@
 // Description : FTP Server Model
 // ===============================================================
 
+enum ServerProtocol { ftp, sftp }
+
 class FtpServerModel {
   final String id;
   final String name;
@@ -17,6 +19,7 @@ class FtpServerModel {
   final bool isFavorite;
   final bool usePassiveMode;
   final bool supportUtf8;
+  final ServerProtocol protocol;
 
   const FtpServerModel({
     required this.id,
@@ -30,6 +33,7 @@ class FtpServerModel {
     this.isFavorite = false,
     this.usePassiveMode = true,
     this.supportUtf8 = true,
+    this.protocol = ServerProtocol.ftp,
   });
 
   FtpServerModel copyWith({
@@ -44,6 +48,7 @@ class FtpServerModel {
     bool? isFavorite,
     bool? usePassiveMode,
     bool? supportUtf8,
+    ServerProtocol? protocol,
   }) {
     return FtpServerModel(
       id: id ?? this.id,
@@ -57,6 +62,7 @@ class FtpServerModel {
       isFavorite: isFavorite ?? this.isFavorite,
       usePassiveMode: usePassiveMode ?? this.usePassiveMode,
       supportUtf8: supportUtf8 ?? this.supportUtf8,
+      protocol: protocol ?? this.protocol,
     );
   }
 
@@ -73,6 +79,7 @@ class FtpServerModel {
       'isFavorite': isFavorite,
       'usePassiveMode': usePassiveMode,
       'supportUtf8': supportUtf8,
+      'protocol': protocol.name,
     };
   }
 
@@ -81,7 +88,7 @@ class FtpServerModel {
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
       host: json['host'] as String? ?? '',
-      port: json['port'] as int? ?? 21,
+      port: json['port'] as int? ?? (json['protocol'] == 'sftp' ? 22 : 21),
       username: json['username'] as String? ?? '',
       password: json['password'] as String? ?? '',
       remotePath: json['remotePath'] as String? ?? '/',
@@ -89,6 +96,10 @@ class FtpServerModel {
       isFavorite: json['isFavorite'] as bool? ?? false,
       usePassiveMode: json['usePassiveMode'] as bool? ?? true,
       supportUtf8: json['supportUtf8'] as bool? ?? true,
+      protocol: ServerProtocol.values.firstWhere(
+        (e) => e.name == json['protocol'],
+        orElse: () => ServerProtocol.ftp,
+      ),
     );
   }
 }

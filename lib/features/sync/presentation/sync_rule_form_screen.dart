@@ -44,6 +44,7 @@ class _SyncRuleFormScreenState extends ConsumerState<SyncRuleFormScreen> {
   bool _syncSubfolders = true;
   bool _includeHiddenFiles = false;
   bool _runOnWifiOnly = true;
+  bool _runOnlyWhileCharging = false;
   bool _appliedSettingsDefaults = false;
   SyncDirection _direction = SyncDirection.twoWay;
   SyncConflictRule _conflictRule = SyncConflictRule.newerWins;
@@ -73,6 +74,7 @@ class _SyncRuleFormScreenState extends ConsumerState<SyncRuleFormScreen> {
     _syncSubfolders = rule.syncSubfolders;
     _includeHiddenFiles = rule.includeHiddenFiles;
     _runOnWifiOnly = rule.runOnWifiOnly;
+    _runOnlyWhileCharging = rule.runOnlyWhileCharging;
     _direction = rule.direction;
     _conflictRule = rule.conflictRule;
     _deleteRule = rule.deleteRule;
@@ -137,6 +139,7 @@ class _SyncRuleFormScreenState extends ConsumerState<SyncRuleFormScreen> {
       syncSubfolders: _syncSubfolders,
       includeHiddenFiles: _includeHiddenFiles,
       runOnWifiOnly: _runOnWifiOnly,
+      runOnlyWhileCharging: _runOnlyWhileCharging,
       homeWifiName: _homeWifiController.text.trim(),
       includePatterns: _includePatternsController.text.trim().isEmpty
           ? '*'
@@ -285,6 +288,12 @@ class _SyncRuleFormScreenState extends ConsumerState<SyncRuleFormScreen> {
                 title: const Text('Run on Wi-Fi Only'),
                 subtitle: const Text('Prevents mobile-data synchronization.'),
                 onChanged: (value) => setState(() => _runOnWifiOnly = value),
+              ),
+              SwitchListTile(
+                value: _runOnlyWhileCharging,
+                title: const Text('Run Only While Charging'),
+                subtitle: const Text('Sync will wait until device is plugged in.'),
+                onChanged: (value) => setState(() => _runOnlyWhileCharging = value),
               ),
               TextFormField(
                 controller: _homeWifiController,

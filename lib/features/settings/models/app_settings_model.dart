@@ -11,6 +11,7 @@ class AppSettingsModel {
   final bool defaultSyncWifiOnly;
   final bool showForegroundNotifications;
   final bool onboardingCompleted;
+  final bool biometricLockEnabled;
 
   const AppSettingsModel({
     this.automaticSchedulingEnabled = true,
@@ -18,6 +19,7 @@ class AppSettingsModel {
     this.defaultSyncWifiOnly = true,
     this.showForegroundNotifications = true,
     this.onboardingCompleted = false,
+    this.biometricLockEnabled = false,
   });
 
   AppSettingsModel copyWith({
@@ -26,6 +28,7 @@ class AppSettingsModel {
     bool? defaultSyncWifiOnly,
     bool? showForegroundNotifications,
     bool? onboardingCompleted,
+    bool? biometricLockEnabled,
   }) {
     return AppSettingsModel(
       automaticSchedulingEnabled:
@@ -36,6 +39,7 @@ class AppSettingsModel {
       showForegroundNotifications:
           showForegroundNotifications ?? this.showForegroundNotifications,
       onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
+      biometricLockEnabled: biometricLockEnabled ?? this.biometricLockEnabled,
     );
   }
 
@@ -46,6 +50,7 @@ class AppSettingsModel {
       'defaultSyncWifiOnly': defaultSyncWifiOnly,
       'showForegroundNotifications': showForegroundNotifications,
       'onboardingCompleted': onboardingCompleted,
+      'biometricLockEnabled': biometricLockEnabled,
     };
   }
 
@@ -58,6 +63,7 @@ class AppSettingsModel {
       showForegroundNotifications:
           json['showForegroundNotifications'] as bool? ?? true,
       onboardingCompleted: json['onboardingCompleted'] as bool? ?? false,
+      biometricLockEnabled: json['biometricLockEnabled'] as bool? ?? false,
     );
   }
 }

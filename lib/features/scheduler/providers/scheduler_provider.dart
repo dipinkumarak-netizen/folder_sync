@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../backup/models/backup_job_model.dart';
@@ -142,6 +143,14 @@ class SchedulerService {
       return false;
     }
 
+    if (job.runOnlyWhileCharging) {
+      final battery = Battery();
+      final state = await battery.batteryState;
+      if (state != BatteryState.charging && state != BatteryState.full) {
+        return false;
+      }
+    }
+
     return switch (job.scheduleRule) {
       BackupScheduleRule.manualOnly => false,
       BackupScheduleRule.hourly => _isDue(
@@ -161,6 +170,14 @@ class SchedulerService {
         rule.status == SyncRuleStatus.running ||
         _runningRuleIds.contains(rule.id)) {
       return false;
+    }
+
+    if (rule.runOnlyWhileCharging) {
+      final battery = Battery();
+      final state = await battery.batteryState;
+      if (state != BatteryState.charging && state != BatteryState.full) {
+        return false;
+      }
     }
 
     return switch (rule.triggerRule) {

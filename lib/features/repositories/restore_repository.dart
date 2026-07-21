@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:dartssh2/dartssh2.dart';
 import 'package:ftpconnect/ftpconnect.dart';
 import 'package:path/path.dart' as path;
 
@@ -171,6 +172,14 @@ class RestoreRepository {
     required String remoteFolderPath,
     required RestoreFilterOptions filterOptions,
   }) async {
+    if (ftpServer.protocol == ServerProtocol.sftp) {
+      return _previewSftpFiles(
+        ftpServer: ftpServer,
+        remoteFolderPath: remoteFolderPath,
+        filterOptions: filterOptions,
+      );
+    }
+
     final ftpConnect = _connectFor(ftpServer);
     var connected = false;
 
@@ -225,6 +234,18 @@ class RestoreRepository {
     RestoreProgressCallback? onProgress,
     RestoreCancellationToken? cancellationToken,
   }) async {
+    if (ftpServer.protocol == ServerProtocol.sftp) {
+      return _runSftpRestore(
+        ftpServer: ftpServer,
+        remoteFolderPath: remoteFolderPath,
+        localFolderPath: localFolderPath,
+        conflictRule: conflictRule,
+        filterOptions: filterOptions,
+        onProgress: onProgress,
+        cancellationToken: cancellationToken,
+      );
+    }
+
     final localDirectory = Directory(localFolderPath);
     if (!await localDirectory.exists()) {
       return const RestoreRunResult(
@@ -703,6 +724,211 @@ class RestoreRepository {
       if (!changed) {
         throw StateError('Could not open remote folder "$part".');
       }
+    }
+  }
+
+  // ==========================================================
+  // SFTP Restore Helpers
+  // ==========================================================
+
+  Future<RestorePreviewResult> _previewSftpFiles({
+    required FtpServerModel ftpServer,
+    required String remoteFolderPath,
+    required RestoreFilterOptions filterOptions,
+  }) async {
+    SSHClient? client;
+    try {
+      client = SSHClient(
+        await SSHSocket.connect(ftpServer.host, ftpServer.port,
+            timeout: const Duration(seconds: 20)),
+        username: ftpServer.username,
+        onPasswordRequest: () => ftpServer.password,
+      );
+
+      final sftp = await client.sftp();
+      final remoteRoot = _normalizeRemotePath(remoteFolderPath);
+      final files = <RestoreFileEntry>[];
+
+      await _collectSftpFiles(
+        sftp: sftp,
+        remoteRoot: remoteRoot,
+        relativeDirectory: '.',
+        filterOptions: filterOptions,
+        files: files,
+      );
+
+      client.close();
+      return RestorePreviewResult(
+        success: true,
+        message: files.isEmpty
+            ? 'No files found in this SFTP folder.'
+            : 'Preview found ${files.length} file(s) via SFTP.',
+        files: files..sort((a, b) => a.relativePath.compareTo(b.relativePath)),
+      );
+    } catch (error) {
+      client?.close();
+      return RestorePreviewResult(
+        success: false,
+        message: FailureMessage.from(error, operation: 'SFTP Preview'),
+        files: const [],
+      );
+    }
+  }
+
+  Future<void> _collectSftpFiles({
+    required SftpClient sftp,
+    required String remoteRoot,
+    required String relativeDirectory,
+    required RestoreFilterOptions filterOptions,
+    required List<RestoreFileEntry> files,
+  }) async {
+    final currentPath = path.posix.join(remoteRoot, relativeDirectory);
+    final entries = await sftp.listdir(currentPath);
+
+    for (final entry in entries) {
+      final relativePath = relativeDirectory == '.'
+          ? entry.filename
+          : path.posix.join(relativeDirectory, entry.filename);
+
+      if (entry.attr.isDirectory && filterOptions.includeSubfolders) {
+        if (entry.filename != '.' && entry.filename != '..') {
+          await _collectSftpFiles(
+            sftp: sftp,
+            remoteRoot: remoteRoot,
+            relativeDirectory: relativePath,
+            filterOptions: filterOptions,
+            files: files,
+          );
+        }
+        continue;
+      }
+
+      if (entry.attr.isFile) {
+        if (_matchesFilter(
+          relativePath: relativePath,
+          name: entry.filename,
+          size: entry.attr.size ?? 0,
+          filterOptions: filterOptions,
+        )) {
+          files.add(RestoreFileEntry(
+            relativePath: relativePath,
+            size: entry.attr.size ?? 0,
+            modifiedAt: entry.attr.modifyTime != null
+                ? DateTime.fromMillisecondsSinceEpoch(
+                    entry.attr.modifyTime! * 1000)
+                : null,
+          ));
+        }
+      }
+    }
+  }
+
+  Future<RestoreRunResult> _runSftpRestore({
+    required FtpServerModel ftpServer,
+    required String remoteFolderPath,
+    required String localFolderPath,
+    required RestoreConflictRule conflictRule,
+    required RestoreFilterOptions filterOptions,
+    RestoreProgressCallback? onProgress,
+    RestoreCancellationToken? cancellationToken,
+  }) async {
+    final localDirectory = Directory(localFolderPath);
+    SSHClient? client;
+
+    try {
+      client = SSHClient(
+        await SSHSocket.connect(ftpServer.host, ftpServer.port,
+            timeout: const Duration(seconds: 20)),
+        username: ftpServer.username,
+        onPasswordRequest: () => ftpServer.password,
+      );
+
+      final sftp = await client.sftp();
+      final remoteRoot = _normalizeRemotePath(remoteFolderPath);
+      final files = <RestoreFileEntry>[];
+
+      await _collectSftpFiles(
+        sftp: sftp,
+        remoteRoot: remoteRoot,
+        relativeDirectory: '.',
+        filterOptions: filterOptions,
+        files: files,
+      );
+
+      var filesRestored = 0;
+      var filesSkipped = 0;
+      var filesOverwritten = 0;
+      var filesKeptBoth = 0;
+      var bytesRestored = 0;
+
+      for (var index = 0; index < files.length; index++) {
+        if (cancellationToken?.isCancelled == true) break;
+
+        final file = files[index];
+        final localFilePath = path.join(localDirectory.path, file.relativePath);
+        final downloadAction = await _downloadActionFor(
+          localFilePath: localFilePath,
+          conflictRule: conflictRule,
+        );
+
+        if (downloadAction == _RestoreDownloadAction.skipped) {
+          filesSkipped++;
+        } else {
+          final targetPath = _targetPathForConflict(
+            localFilePath: localFilePath,
+            conflictRule: conflictRule,
+          );
+          final destinationFile = File(targetPath);
+          await destinationFile.parent.create(recursive: true);
+
+          final remoteFilePath = path.posix.join(remoteRoot, file.relativePath);
+          final remoteFile = await sftp.open(remoteFilePath);
+          final sink = destinationFile.openWrite();
+          await sink.addStream(remoteFile.read());
+          await sink.close();
+
+          if (downloadAction == _RestoreDownloadAction.overwritten) {
+            filesOverwritten++;
+          } else if (downloadAction == _RestoreDownloadAction.keptBoth) {
+            filesKeptBoth++;
+          }
+          filesRestored++;
+          bytesRestored += file.size;
+        }
+
+        await onProgress?.call(RestoreProgressUpdate(
+          currentFileIndex: index + 1,
+          totalFiles: files.length,
+          currentFilePath: file.relativePath,
+          filesRestored: filesRestored,
+          filesSkipped: filesSkipped,
+          filesOverwritten: filesOverwritten,
+          filesKeptBoth: filesKeptBoth,
+          bytesRestored: bytesRestored,
+        ));
+      }
+
+      client.close();
+      return RestoreRunResult(
+        success: true,
+        message: 'SFTP restore completed.',
+        filesRestored: filesRestored,
+        filesSkipped: filesSkipped,
+        filesOverwritten: filesOverwritten,
+        filesKeptBoth: filesKeptBoth,
+        bytesRestored: bytesRestored,
+      );
+    } catch (error) {
+      client?.close();
+      return RestoreRunResult(
+        success: false,
+        message: FailureMessage.from(error, operation: 'SFTP Restore'),
+        filesRestored: 0,
+        filesSkipped: 0,
+        filesOverwritten: 0,
+        filesKeptBoth: 0,
+        bytesRestored: 0,
+      );
     }
   }
 }

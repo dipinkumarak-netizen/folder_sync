@@ -40,6 +40,7 @@ class SyncRuleModel {
   final bool syncSubfolders;
   final bool includeHiddenFiles;
   final bool runOnWifiOnly;
+  final bool runOnlyWhileCharging;
   final String homeWifiName;
   final String includePatterns;
   final String excludePatterns;
@@ -65,6 +66,7 @@ class SyncRuleModel {
     this.syncSubfolders = true,
     this.includeHiddenFiles = false,
     this.runOnWifiOnly = true,
+    this.runOnlyWhileCharging = false,
     this.homeWifiName = '',
     this.includePatterns = '*',
     this.excludePatterns = '',
@@ -91,6 +93,7 @@ class SyncRuleModel {
     bool? syncSubfolders,
     bool? includeHiddenFiles,
     bool? runOnWifiOnly,
+    bool? runOnlyWhileCharging,
     String? homeWifiName,
     String? includePatterns,
     String? excludePatterns,
@@ -117,6 +120,7 @@ class SyncRuleModel {
       syncSubfolders: syncSubfolders ?? this.syncSubfolders,
       includeHiddenFiles: includeHiddenFiles ?? this.includeHiddenFiles,
       runOnWifiOnly: runOnWifiOnly ?? this.runOnWifiOnly,
+      runOnlyWhileCharging: runOnlyWhileCharging ?? this.runOnlyWhileCharging,
       homeWifiName: homeWifiName ?? this.homeWifiName,
       includePatterns: includePatterns ?? this.includePatterns,
       excludePatterns: excludePatterns ?? this.excludePatterns,
@@ -147,6 +151,7 @@ class SyncRuleModel {
       'syncSubfolders': syncSubfolders,
       'includeHiddenFiles': includeHiddenFiles,
       'runOnWifiOnly': runOnWifiOnly,
+      'runOnlyWhileCharging': runOnlyWhileCharging,
       'homeWifiName': homeWifiName,
       'includePatterns': includePatterns,
       'excludePatterns': excludePatterns,
@@ -197,6 +202,7 @@ class SyncRuleModel {
       syncSubfolders: json['syncSubfolders'] as bool? ?? true,
       includeHiddenFiles: json['includeHiddenFiles'] as bool? ?? false,
       runOnWifiOnly: json['runOnWifiOnly'] as bool? ?? true,
+      runOnlyWhileCharging: json['runOnlyWhileCharging'] as bool? ?? false,
       homeWifiName: json['homeWifiName'] as String? ?? '',
       includePatterns: json['includePatterns'] as String? ?? '*',
       excludePatterns: json['excludePatterns'] as String? ?? '',

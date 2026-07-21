@@ -3,6 +3,7 @@ import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:dartssh2/dartssh2.dart';
 import 'package:ftpconnect/ftpconnect.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
@@ -125,6 +126,10 @@ class FtpMemoryRepository {
   Future<FtpConnectionTestResult> testConnectionDetailed(
     FtpServerModel server,
   ) async {
+    if (server.protocol == ServerProtocol.sftp) {
+      return _testSftpConnection(server);
+    }
+
     final ftpConnect = FTPConnect(
       server.host,
       port: server.port,
@@ -186,6 +191,10 @@ class FtpMemoryRepository {
     required FtpServerModel server,
     required String remotePath,
   }) async {
+    if (server.protocol == ServerProtocol.sftp) {
+      return _listSftpFolders(server: server, remotePath: remotePath);
+    }
+
     final ftpConnect = FTPConnect(
       server.host,
       port: server.port,
@@ -344,6 +353,99 @@ class FtpMemoryRepository {
       if (!changed) {
         throw StateError('Could not open remote folder "$part".');
       }
+    }
+  }
+
+  // ==========================================================
+  // SFTP Helpers
+  // ==========================================================
+
+  Future<FtpConnectionTestResult> _testSftpConnection(
+    FtpServerModel server,
+  ) async {
+    SSHClient? client;
+    try {
+      client = SSHClient(
+        await SSHSocket.connect(server.host, server.port,
+            timeout: const Duration(seconds: 10)),
+        username: server.username,
+        onPasswordRequest: () => server.password,
+      );
+
+      final sftp = await client.sftp();
+      
+      final remotePath = server.remotePath.trim();
+      if (remotePath.isNotEmpty && remotePath != '/' && remotePath != '.') {
+        await sftp.stat(remotePath);
+      }
+
+      client.close();
+      return const FtpConnectionTestResult(
+        success: true,
+        message: 'SFTP connection successful.',
+      );
+    } catch (error) {
+      client?.close();
+      return FtpConnectionTestResult(
+        success: false,
+        message: FailureMessage.from(
+          error,
+          operation: 'SFTP connection test',
+          fallback: 'Could not connect to the SFTP server.',
+        ),
+      );
+    }
+  }
+
+  Future<FtpRemoteFolderListResult> _listSftpFolders({
+    required FtpServerModel server,
+    required String remotePath,
+  }) async {
+    SSHClient? client;
+    try {
+      client = SSHClient(
+        await SSHSocket.connect(server.host, server.port,
+            timeout: const Duration(seconds: 15)),
+        username: server.username,
+        onPasswordRequest: () => server.password,
+      );
+
+      final sftp = await client.sftp();
+      final currentPath = _normalizeRemotePath(remotePath);
+      
+      final entries = await sftp.listdir(currentPath);
+      final folders = entries
+          .where((entry) => entry.attr.isDirectory)
+          .map((entry) => FtpRemoteFolderEntry(
+                name: entry.filename,
+                path: _joinRemotePath(currentPath, entry.filename),
+              ))
+          .where((entry) =>
+              entry.name != '.' && entry.name != '..')
+          .toList()
+        ..sort((first, second) => first.name.compareTo(second.name));
+
+      client.close();
+      return FtpRemoteFolderListResult(
+        success: true,
+        message: folders.isEmpty
+            ? 'No folders found in this remote folder.'
+            : 'Folders loaded.',
+        currentPath: currentPath,
+        folders: folders,
+      );
+    } catch (error) {
+      client?.close();
+      return FtpRemoteFolderListResult(
+        success: false,
+        message: FailureMessage.from(
+          error,
+          operation: 'Remote SFTP folder browser',
+          fallback: 'Could not list SFTP folders.',
+        ),
+        currentPath: _normalizeRemotePath(remotePath),
+        folders: const [],
+      );
     }
   }
 }

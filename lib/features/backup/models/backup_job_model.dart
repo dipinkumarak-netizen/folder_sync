@@ -18,6 +18,8 @@ class BackupJobModel {
   final bool enabled;
   final BackupScheduleRule scheduleRule;
   final bool runOnWifiOnly;
+  final bool runOnlyWhileCharging;
+  final bool compressBeforeUpload;
   final String homeWifiName;
   final BackupJobStatus status;
   final DateTime? lastRunAt;
@@ -36,6 +38,8 @@ class BackupJobModel {
     this.enabled = true,
     this.scheduleRule = BackupScheduleRule.manualOnly,
     this.runOnWifiOnly = true,
+    this.runOnlyWhileCharging = false,
+    this.compressBeforeUpload = false,
     this.homeWifiName = '',
     this.status = BackupJobStatus.idle,
     this.lastRunAt,
@@ -55,6 +59,8 @@ class BackupJobModel {
     bool? enabled,
     BackupScheduleRule? scheduleRule,
     bool? runOnWifiOnly,
+    bool? runOnlyWhileCharging,
+    bool? compressBeforeUpload,
     String? homeWifiName,
     BackupJobStatus? status,
     DateTime? lastRunAt,
@@ -73,6 +79,8 @@ class BackupJobModel {
       enabled: enabled ?? this.enabled,
       scheduleRule: scheduleRule ?? this.scheduleRule,
       runOnWifiOnly: runOnWifiOnly ?? this.runOnWifiOnly,
+      runOnlyWhileCharging: runOnlyWhileCharging ?? this.runOnlyWhileCharging,
+      compressBeforeUpload: compressBeforeUpload ?? this.compressBeforeUpload,
       homeWifiName: homeWifiName ?? this.homeWifiName,
       status: status ?? this.status,
       lastRunAt: lastRunAt ?? this.lastRunAt,
@@ -96,6 +104,8 @@ class BackupJobModel {
       'enabled': enabled,
       'scheduleRule': scheduleRule.name,
       'runOnWifiOnly': runOnWifiOnly,
+      'runOnlyWhileCharging': runOnlyWhileCharging,
+      'compressBeforeUpload': compressBeforeUpload,
       'homeWifiName': homeWifiName,
       'status': status.name,
       'lastRunAt': lastRunAt?.toIso8601String(),
@@ -127,6 +137,8 @@ class BackupJobModel {
         BackupScheduleRule.manualOnly,
       ),
       runOnWifiOnly: json['runOnWifiOnly'] as bool? ?? true,
+      runOnlyWhileCharging: json['runOnlyWhileCharging'] as bool? ?? false,
+      compressBeforeUpload: json['compressBeforeUpload'] as bool? ?? false,
       homeWifiName: json['homeWifiName'] as String? ?? '',
       status: status == BackupJobStatus.running ? BackupJobStatus.idle : status,
       lastRunAt: lastRunAtValue == null

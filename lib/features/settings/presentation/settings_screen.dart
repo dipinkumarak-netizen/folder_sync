@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:local_auth/local_auth.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/constants/app_colors.dart';
@@ -35,6 +36,33 @@ class SettingsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(AppSizes.paddingM),
         children: [
+          _ServerSection(),
+          const SizedBox(height: AppSizes.paddingM),
+          _PermissionsSection(settings: settings),
+          const SizedBox(height: AppSizes.paddingM),
+          _SettingsSection(
+            icon: Icons.security_rounded,
+            iconColor: Colors.blueAccent,
+            title: 'Security',
+            children: [
+              _SwitchSettingTile(
+                title: 'Biometric Lock',
+                subtitle: 'Require fingerprint or face ID to open app.',
+                value: settings.biometricLockEnabled,
+                onChanged: (value) async {
+                  if (value) {
+                    final authenticated = await _authenticate(ref);
+                    if (!authenticated) return;
+                  }
+                  await _updateSettings(
+                    ref,
+                    settings.copyWith(biometricLockEnabled: value),
+                  );
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSizes.paddingM),
           _SettingsSection(
             icon: AppIcons.schedule,
             iconColor: AppColors.schedule,
@@ -79,10 +107,6 @@ class SettingsScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: AppSizes.paddingM),
-          _ServerSection(),
-          const SizedBox(height: AppSizes.paddingM),
-          _PermissionsSection(settings: settings),
-          const SizedBox(height: AppSizes.paddingM),
           _DataSection(),
           const SizedBox(height: AppSizes.paddingM),
           const _AppInfoSection(),
@@ -96,6 +120,24 @@ class SettingsScreen extends ConsumerWidget {
     await ref.read(appSettingsProvider.notifier).updateSettings(settings);
     await ref.read(schedulerProvider).refreshBackgroundSchedule();
   }
+
+  Future<bool> _authenticate(WidgetRef ref) async {
+    final auth = LocalAuthentication();
+    try {
+      final canCheck = await auth.canCheckBiometrics || await auth.isDeviceSupported();
+      if (!canCheck) return false;
+
+      return await auth.authenticate(
+        localizedReason: 'Authenticate to enable biometric lock',
+        options: const AuthenticationOptions(
+          stickyAuth: true,
+          biometricOnly: true,
+        ),
+      );
+    } catch (_) {
+      return false;
+    }
+  }
 }
 
 class _ServerSection extends StatelessWidget {
@@ -104,11 +146,11 @@ class _ServerSection extends StatelessWidget {
     return _SettingsSection(
       icon: AppIcons.server,
       iconColor: Colors.blue,
-      title: 'FTP Connections',
+      title: 'Servers',
       children: [
         _ActionSettingTile(
-          title: 'FTP Servers',
-          subtitle: 'Configure and manage your FTP server connections.',
+          title: 'Connections',
+          subtitle: 'Configure and manage your FTP/SFTP server connections.',
           actionLabel: 'Manage',
           onPressed: () {
             Navigator.push(
@@ -122,67 +164,87 @@ class _ServerSection extends StatelessWidget {
   }
 }
 
-class _PermissionsSection extends ConsumerWidget {
+class _PermissionsSection extends ConsumerStatefulWidget {
   const _PermissionsSection({required this.settings});
 
   final AppSettingsModel settings;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return _SettingsSection(
-      icon: AppIcons.info,
-      iconColor: AppColors.info,
-      title: 'Permissions',
-      children: [
-        _SwitchSettingTile(
-          title: 'Foreground Notifications',
-          subtitle: 'Shows progress while backup and sync jobs run.',
-          value: settings.showForegroundNotifications,
-          onChanged: (value) async {
-            await ref
-                .read(appSettingsProvider.notifier)
-                .updateSettings(
-                  settings.copyWith(showForegroundNotifications: value),
+  ConsumerState<_PermissionsSection> createState() => _PermissionsSectionState();
+}
+
+class _PermissionsSectionState extends ConsumerState<_PermissionsSection> {
+  @override
+  Widget build(BuildContext context) {
+    return OBCard(
+      padding: EdgeInsets.zero,
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          leading: Padding(
+            padding: const EdgeInsets.only(left: AppSizes.paddingM),
+            child: CircleAvatar(
+              radius: 20,
+              backgroundColor: AppColors.info.withValues(alpha: 0.15),
+              child: const Icon(AppIcons.info, color: AppColors.info, size: 20),
+            ),
+          ),
+          title: Text(
+            'Permissions',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          childrenPadding: const EdgeInsets.symmetric(horizontal: AppSizes.paddingM),
+          children: [
+            const Divider(height: 1),
+            _SwitchSettingTile(
+              title: 'Foreground Notifications',
+              subtitle: 'Shows progress while backup and sync jobs run.',
+              value: widget.settings.showForegroundNotifications,
+              onChanged: (value) async {
+                await ref.read(appSettingsProvider.notifier).updateSettings(
+                      widget.settings.copyWith(showForegroundNotifications: value),
+                    );
+                await ref.read(schedulerProvider).refreshBackgroundSchedule();
+                if (value) {
+                  await Permission.notification.request();
+                }
+              },
+            ),
+            const Divider(height: AppSizes.paddingL),
+            _ActionSettingTile(
+              title: 'Permission Check',
+              subtitle: 'Review storage, notification, Wi-Fi, and battery readiness.',
+              actionLabel: 'Open',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const PermissionReadinessScreen(),
+                  ),
                 );
-            await ref.read(schedulerProvider).refreshBackgroundSchedule();
-            if (value) {
-              await Permission.notification.request();
-            }
-          },
+              },
+            ),
+            const Divider(height: AppSizes.paddingL),
+            _ActionSettingTile(
+              title: 'Wi-Fi Name Access',
+              subtitle: 'Required for home Wi-Fi backup and sync rules.',
+              actionLabel: 'Allow',
+              onPressed: () async {
+                await Permission.nearbyWifiDevices.request();
+                await Permission.locationWhenInUse.request();
+              },
+            ),
+            const Divider(height: AppSizes.paddingL),
+            _ActionSettingTile(
+              title: 'Android App Settings',
+              subtitle: 'Open system permissions and battery settings.',
+              actionLabel: 'Open',
+              onPressed: openAppSettings,
+            ),
+            const SizedBox(height: AppSizes.paddingM),
+          ],
         ),
-        const Divider(height: AppSizes.paddingL),
-        _ActionSettingTile(
-          title: 'Permission Check',
-          subtitle:
-              'Review storage, notification, Wi-Fi, and battery readiness.',
-          actionLabel: 'Open',
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const PermissionReadinessScreen(),
-              ),
-            );
-          },
-        ),
-        const Divider(height: AppSizes.paddingL),
-        _ActionSettingTile(
-          title: 'Wi-Fi Name Access',
-          subtitle: 'Required for home Wi-Fi backup and sync rules.',
-          actionLabel: 'Allow',
-          onPressed: () async {
-            await Permission.nearbyWifiDevices.request();
-            await Permission.locationWhenInUse.request();
-          },
-        ),
-        const Divider(height: AppSizes.paddingL),
-        _ActionSettingTile(
-          title: 'Android App Settings',
-          subtitle: 'Open system permissions and battery settings.',
-          actionLabel: 'Open',
-          onPressed: openAppSettings,
-        ),
-      ],
+      ),
     );
   }
 }

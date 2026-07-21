@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:local_auth/local_auth.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
@@ -32,12 +33,20 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   Future<void> _navigateToHome() async {
-    await Future<void>.delayed(const Duration(seconds: 2));
     await ref.read(appSettingsProvider.notifier).loadSettings();
+    final settings = ref.read(appSettingsProvider);
+
+    if (settings.biometricLockEnabled) {
+      final authenticated = await _authenticate();
+      if (!authenticated) {
+        return;
+      }
+    }
+
+    await Future<void>.delayed(const Duration(milliseconds: 500));
 
     if (!mounted) return;
 
-    final settings = ref.read(appSettingsProvider);
     final nextScreen = settings.onboardingCompleted
         ? const HomeScreen()
         : const OnboardingReadinessScreen();
@@ -45,6 +54,24 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     Navigator.of(
       context,
     ).pushReplacement(MaterialPageRoute(builder: (_) => nextScreen));
+  }
+
+  Future<bool> _authenticate() async {
+    final auth = LocalAuthentication();
+    try {
+      final canCheck = await auth.canCheckBiometrics || await auth.isDeviceSupported();
+      if (!canCheck) return true; // If device doesn't support, let them in
+
+      return await auth.authenticate(
+        localizedReason: 'Authenticate to open ${AppStrings.appName}',
+        options: const AuthenticationOptions(
+          stickyAuth: true,
+          biometricOnly: true,
+        ),
+      );
+    } catch (_) {
+      return false;
+    }
   }
 
   @override

@@ -17,15 +17,17 @@ dependencies:
   flutter_riverpod: ^2.6.1
 
 
-  # Path
+  # Storage & Archive
   path_provider: ^2.1.5
   path: ^1.9.1
+  archive: ^3.6.1
 
   # UUID
   uuid: ^4.5.1
 
-  # FTP
+  # FTP & SFTP
   ftpconnect: ^2.0.7
+  dartssh2: ^2.5.2
 
   # Device Info
   device_info_plus: ^11.5.0
@@ -37,6 +39,7 @@ dependencies:
 
   # Permissions
   permission_handler: ^12.0.1
+  local_auth: ^2.3.0
 
   # Logging
   logger: ^2.6.1
@@ -46,12 +49,12 @@ dev_dependencies:
     sdk: flutter
 
   flutter_launcher_icons: ^0.14.3
+  flutter_lints: ^5.0.0
 
 flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/icon/icon.png"
-  flutter_lints: ^6.0.0
 
 flutter:
   uses-material-design: true

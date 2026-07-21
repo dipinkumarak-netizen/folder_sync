@@ -16,9 +16,10 @@ import '../widgets/remote_folder_picker_field.dart';
 /// ===============================================================
 
 class FtpServerFormScreen extends ConsumerStatefulWidget {
-  const FtpServerFormScreen({super.key, this.server});
+  const FtpServerFormScreen({super.key, this.server, this.protocol});
 
   final FtpServerModel? server;
+  final ServerProtocol? protocol;
 
   @override
   ConsumerState<FtpServerFormScreen> createState() =>
@@ -35,6 +36,7 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
   final _passwordController = TextEditingController();
   final _remotePathController = TextEditingController(text: "/");
 
+  ServerProtocol _protocol = ServerProtocol.ftp;
   bool _anonymousLogin = false;
   bool _showPassword = false;
   bool _isTestingConnection = false;
@@ -45,6 +47,13 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
   @override
   void initState() {
     super.initState();
+
+    if (widget.protocol != null) {
+      _protocol = widget.protocol!;
+      if (_protocol == ServerProtocol.sftp) {
+        _portController.text = "22";
+      }
+    }
 
     final server = widget.server;
     if (server == null) {
@@ -57,6 +66,7 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
     _userController.text = server.username;
     _passwordController.text = server.password;
     _remotePathController.text = server.remotePath;
+    _protocol = server.protocol;
     _anonymousLogin = server.isAnonymous;
     _supportUtf8 = server.supportUtf8;
   }
@@ -94,6 +104,7 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
       username: _anonymousLogin ? '' : _userController.text.trim(),
       password: _anonymousLogin ? '' : _passwordController.text,
       remotePath: remotePath.isEmpty ? '/' : remotePath,
+      protocol: _protocol,
       isAnonymous: _anonymousLogin,
       isFavorite: widget.server?.isFavorite ?? false,
       supportUtf8: _supportUtf8,
@@ -155,7 +166,9 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text(_isEditing ? "Edit FTP Server" : "Add FTP Server"),
+        title: Text(_isEditing 
+            ? "Edit ${_protocol.name.toUpperCase()} Connection" 
+            : "Add ${_protocol.name.toUpperCase()} Connection"),
       ),
       body: SafeArea(
         child: Form(

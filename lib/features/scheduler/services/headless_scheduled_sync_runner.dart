@@ -1,3 +1,4 @@
+import 'package:battery_plus/battery_plus.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
 import '../../backup/models/backup_job_model.dart';
@@ -221,6 +222,13 @@ class HeadlessScheduledSyncRunner {
       return false;
     }
 
+    if (job.runOnlyWhileCharging) {
+      final state = await Battery().batteryState;
+      if (state != BatteryState.charging && state != BatteryState.full) {
+        return false;
+      }
+    }
+
     return switch (job.scheduleRule) {
       BackupScheduleRule.manualOnly => false,
       BackupScheduleRule.hourly => _isDue(
@@ -260,6 +268,13 @@ class HeadlessScheduledSyncRunner {
   Future<bool> _shouldRunRule(SyncRuleModel rule) async {
     if (!rule.enabled || rule.status == SyncRuleStatus.running) {
       return false;
+    }
+
+    if (rule.runOnlyWhileCharging) {
+      final state = await Battery().batteryState;
+      if (state != BatteryState.charging && state != BatteryState.full) {
+        return false;
+      }
     }
 
     if (!await _checkNetworkPolicy(rule)) {

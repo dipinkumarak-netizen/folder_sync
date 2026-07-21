@@ -17,6 +17,65 @@ import 'ftp_server_form_screen.dart';
 class FtpServerListScreen extends ConsumerWidget {
   const FtpServerListScreen({super.key});
 
+  void _openForm(BuildContext context, [ServerProtocol protocol = ServerProtocol.ftp]) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FtpServerFormScreen(
+          protocol: protocol,
+        ),
+      ),
+    );
+  }
+
+  void _showAddDialog(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(AppSizes.paddingM),
+              child: Text(
+                'Choose Protocol',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Colors.blue,
+                child: Icon(Icons.sync_alt, color: Colors.white),
+              ),
+              title: const Text('FTP'),
+              subtitle: const Text('Standard File Transfer Protocol'),
+              onTap: () {
+                Navigator.pop(context);
+                _openForm(context, ServerProtocol.ftp);
+              },
+            ),
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Colors.blueAccent,
+                child: Icon(Icons.security, color: Colors.white),
+              ),
+              title: const Text('SFTP'),
+              subtitle: const Text('Secure File Transfer Protocol (SSH)'),
+              onTap: () {
+                Navigator.pop(context);
+                _openForm(context, ServerProtocol.sftp);
+              },
+            ),
+            const SizedBox(height: AppSizes.paddingM),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(ftpServerLoadProvider);
@@ -24,15 +83,10 @@ class FtpServerListScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text("FTP Servers")),
+      appBar: AppBar(title: const Text("Connections")),
       floatingActionButton: FloatingActionButton(
-        tooltip: "Add FTP Server",
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const FtpServerFormScreen()),
-          );
-        },
+        tooltip: "Add Connection",
+        onPressed: () => _showAddDialog(context),
         child: const Icon(Icons.add),
       ),
       body: servers.isEmpty
@@ -70,7 +124,7 @@ class _EmptyServerList extends StatelessWidget {
               Icon(Icons.dns_rounded, size: 60, color: Colors.blue),
               SizedBox(height: 16),
               Text(
-                "No FTP Servers",
+                "No Connections",
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
@@ -79,7 +133,7 @@ class _EmptyServerList extends StatelessWidget {
               ),
               SizedBox(height: 10),
               Text(
-                "Press the + button to add your first FTP server.",
+                "Press the + button to add your first server connection.",
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white70),
               ),
@@ -108,8 +162,8 @@ class _FtpServerTile extends ConsumerWidget {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text("Delete FTP Server"),
-          content: Text('Delete "${server.name}" from your FTP servers?'),
+          title: const Text("Delete Connection"),
+          content: Text('Delete "${server.name}" from your connections?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -134,6 +188,7 @@ class _FtpServerTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final username = server.isAnonymous ? 'Anonymous' : server.username;
+    final protocolLabel = server.protocol.name.toUpperCase();
 
     return Material(
       color: Colors.transparent,
@@ -152,16 +207,45 @@ class _FtpServerTile extends ConsumerWidget {
               CircleAvatar(
                 radius: 26,
                 backgroundColor: AppColors.primary.withValues(alpha: 0.15),
-                child: const Icon(Icons.dns_rounded, color: AppColors.primary),
+                child: Icon(
+                  server.protocol == ServerProtocol.sftp
+                      ? Icons.security
+                      : Icons.dns_rounded,
+                  color: AppColors.primary,
+                ),
               ),
               const SizedBox(width: AppSizes.paddingM),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      server.name,
-                      style: Theme.of(context).textTheme.titleMedium,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            server.name,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            protocolLabel,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: AppSizes.paddingXS),
                     Text(
@@ -183,12 +267,12 @@ class _FtpServerTile extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
-                    tooltip: "Edit FTP Server",
+                    tooltip: "Edit Connection",
                     icon: const Icon(Icons.edit_rounded),
                     onPressed: () => _openEditForm(context),
                   ),
                   IconButton(
-                    tooltip: "Delete FTP Server",
+                    tooltip: "Delete Connection",
                     icon: const Icon(Icons.delete_rounded),
                     color: AppColors.error,
                     onPressed: () => _confirmDelete(context, ref),
