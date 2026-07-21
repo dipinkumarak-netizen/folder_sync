@@ -66,6 +66,23 @@ class PermissionReadinessNotifier
     await refresh();
   }
 
+  Future<void> requestStorage() async {
+    if (Platform.isAndroid) {
+      // For general file access on Android 11+, MANAGE_EXTERNAL_STORAGE is often needed for sync apps
+      // but we first try the standard storage permission.
+      await Permission.storage.request();
+      
+      // If we are on Android 11+ and still not granted, we might need to request manageExternalStorage
+      // but that's a special intent. permission_handler handles it.
+      if (await Permission.storage.isDenied) {
+        await Permission.manageExternalStorage.request();
+      }
+    } else {
+      await Permission.storage.request();
+    }
+    await refresh();
+  }
+
   Future<void> requestBatteryOptimizationExemption() async {
     await BatteryOptimizationService.requestIgnoreBatteryOptimizations();
     await refresh();
@@ -78,9 +95,29 @@ class PermissionReadinessNotifier
     final batteryOptimizationIgnored =
         await BatteryOptimizationService.isIgnoringBatteryOptimizations();
     final storageWritable = await _canWriteAppStorage();
+    
+    final storageStatus = await Permission.storage.status;
+    final manageStorageStatus = await Permission.manageExternalStorage.status;
+    
+    final isStorageReady = storageStatus.isGranted || manageStorageStatus.isGranted;
 
     return PermissionReadinessSnapshot(
       items: [
+        PermissionReadinessItem(
+          id: 'storage',
+          title: 'Storage Access',
+          message: isStorageReady
+              ? 'External storage access is granted.'
+              : 'App needs permission to read and write files for backup.',
+          status: isStorageReady
+              ? ReadinessStatus.ready
+              : storageStatus.isPermanentlyDenied || manageStorageStatus.isPermanentlyDenied
+                  ? ReadinessStatus.blocked
+                  : ReadinessStatus.warning,
+          actionLabel: (storageStatus.isPermanentlyDenied || manageStorageStatus.isPermanentlyDenied)
+              ? 'Settings'
+              : 'Allow',
+        ),
         PermissionReadinessItem(
           id: 'app_storage',
           title: 'App Storage',

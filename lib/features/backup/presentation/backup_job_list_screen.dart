@@ -172,29 +172,44 @@ class _ForegroundReadinessCard extends ConsumerWidget {
         message: 'Backup can run now, but notification readiness is unknown.',
       ),
       data: (state) {
-        if (state.canShowForegroundProgress) {
+        if (state.allReady) {
           return const _PermissionContent(
             icon: AppIcons.success,
             iconColor: AppColors.success,
-            title: 'Foreground Backup Ready',
-            message: 'Backup progress notifications are enabled.',
+            title: 'Backup Readiness',
+            message: 'Notifications and storage permissions are granted.',
+          );
+        }
+
+        if (!state.canShowForegroundProgress) {
+          return _PermissionContent(
+            icon: AppIcons.warning,
+            iconColor: AppColors.warning,
+            title: 'Enable Backup Notifications',
+            message:
+                'Android requires a visible notification for long-running backup work.',
+            actionLabel: state.notificationPermanentlyDenied
+                ? 'Open Settings'
+                : 'Allow Notifications',
+            onAction: state.notificationPermanentlyDenied
+                ? openAppSettings
+                : () => ref
+                    .read(backupPermissionProvider.notifier)
+                    .requestNotificationPermission(),
           );
         }
 
         return _PermissionContent(
-          icon: AppIcons.warning,
-          iconColor: AppColors.warning,
-          title: 'Enable Backup Notifications',
-          message:
-              'Android requires a visible notification for long-running backup work.',
-          actionLabel: state.notificationPermanentlyDenied
-              ? 'Open Settings'
-              : 'Allow Notifications',
-          onAction: state.notificationPermanentlyDenied
+          icon: AppIcons.error,
+          iconColor: AppColors.error,
+          title: 'Storage Permission Required',
+          message: 'The app needs storage access to read local folders.',
+          actionLabel: state.storagePermanentlyDenied ? 'Settings' : 'Allow',
+          onAction: state.storagePermanentlyDenied
               ? openAppSettings
               : () => ref
-                    .read(backupPermissionProvider.notifier)
-                    .requestNotificationPermission(),
+                  .read(backupPermissionProvider.notifier)
+                  .requestStoragePermission(),
         );
       },
     );

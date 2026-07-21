@@ -171,6 +171,14 @@ class _ReadinessTile extends ConsumerWidget {
   ) async {
     final notifier = ref.read(permissionReadinessProvider.notifier);
     switch (item.id) {
+      case 'storage':
+        if (item.status == ReadinessStatus.blocked) {
+          await openAppSettings();
+          await notifier.refresh();
+          return;
+        }
+        await notifier.requestStorage();
+        return;
       case 'notifications':
         if (item.status == ReadinessStatus.blocked) {
           await openAppSettings();

@@ -11,13 +11,19 @@ import 'package:permission_handler/permission_handler.dart';
 class BackupPermissionState {
   final bool notificationGranted;
   final bool notificationPermanentlyDenied;
+  final bool storageGranted;
+  final bool storagePermanentlyDenied;
 
   const BackupPermissionState({
     required this.notificationGranted,
     required this.notificationPermanentlyDenied,
+    required this.storageGranted,
+    required this.storagePermanentlyDenied,
   });
 
   bool get canShowForegroundProgress => notificationGranted;
+  bool get canAccessFiles => storageGranted;
+  bool get allReady => notificationGranted && storageGranted;
 }
 
 class BackupPermissionNotifier
@@ -39,11 +45,28 @@ class BackupPermissionNotifier
     });
   }
 
+  Future<void> requestStoragePermission() async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      if (await Permission.storage.request().isDenied) {
+        await Permission.manageExternalStorage.request();
+      }
+      return _readState();
+    });
+  }
+
   Future<BackupPermissionState> _readState() async {
-    final status = await Permission.notification.status;
+    final notificationStatus = await Permission.notification.status;
+    final storageStatus = await Permission.storage.status;
+    final manageStorageStatus = await Permission.manageExternalStorage.status;
+
     return BackupPermissionState(
-      notificationGranted: status.isGranted,
-      notificationPermanentlyDenied: status.isPermanentlyDenied,
+      notificationGranted: notificationStatus.isGranted,
+      notificationPermanentlyDenied: notificationStatus.isPermanentlyDenied,
+      storageGranted: storageStatus.isGranted || manageStorageStatus.isGranted,
+      storagePermanentlyDenied:
+          storageStatus.isPermanentlyDenied ||
+          manageStorageStatus.isPermanentlyDenied,
     );
   }
 }

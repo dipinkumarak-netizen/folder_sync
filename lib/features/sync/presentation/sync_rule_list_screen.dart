@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_icons.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/widgets/transfer_status_bar.dart';
 import '../../../core/widgets/ob_card.dart';
+import '../../backup/providers/backup_permission_provider.dart';
 import '../../ftp/models/ftp_server_model.dart';
 import '../../ftp/presentation/ftp_server_list_screen.dart';
 import '../../ftp/providers/ftp_provider.dart';
@@ -51,6 +53,8 @@ class SyncRuleListScreen extends ConsumerWidget {
           ? ListView(
               padding: const EdgeInsets.all(AppSizes.paddingM),
               children: [
+                const _SyncPermissionCard(),
+                const SizedBox(height: AppSizes.paddingM),
                 _SyncRulesOverview(hasFtpServers: ftpServers.isNotEmpty),
                 if (transferProgress?.active == true) ...[
                   const SizedBox(height: AppSizes.paddingM),
@@ -69,6 +73,8 @@ class SyncRuleListScreen extends ConsumerWidget {
                 if (index == 0) {
                   return Column(
                     children: [
+                      const _SyncPermissionCard(),
+                      const SizedBox(height: AppSizes.paddingM),
                       _SyncRulesOverview(hasFtpServers: ftpServers.isNotEmpty),
                       if (transferProgress?.active == true) ...[
                         const SizedBox(height: AppSizes.paddingM),
@@ -191,6 +197,76 @@ class _EmptySyncRules extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _SyncPermissionCard extends ConsumerWidget {
+  const _SyncPermissionCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final permissionState = ref.watch(backupPermissionProvider);
+
+    return permissionState.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (state) {
+        if (state.allReady) return const SizedBox.shrink();
+
+        final isStorageIssue = !state.storageGranted;
+
+        return OBCard(
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: AppColors.warning.withValues(alpha: 0.15),
+                child: const Icon(AppIcons.warning, color: AppColors.warning, size: 20),
+              ),
+              const SizedBox(width: AppSizes.paddingM),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isStorageIssue ? 'Storage Access Needed' : 'Notifications Needed',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    Text(
+                      isStorageIssue 
+                        ? 'Sync requires permission to read/write files.'
+                        : 'Notifications are needed for background sync.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textHint),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  if (isStorageIssue) {
+                    if (state.storagePermanentlyDenied) {
+                      openAppSettings();
+                    } else {
+                      ref.read(backupPermissionProvider.notifier).requestStoragePermission();
+                    }
+                  } else {
+                    if (state.notificationPermanentlyDenied) {
+                      openAppSettings();
+                    } else {
+                      ref.read(backupPermissionProvider.notifier).requestNotificationPermission();
+                    }
+                  }
+                },
+                child: Text(
+                  (isStorageIssue ? state.storagePermanentlyDenied : state.notificationPermanentlyDenied)
+                    ? 'Settings' : 'Allow'
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
