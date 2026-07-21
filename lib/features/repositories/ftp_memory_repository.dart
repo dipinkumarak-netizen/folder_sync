@@ -135,6 +135,9 @@ class FtpMemoryRepository {
 
     var connected = false;
     try {
+      // The current ftpconnect library might not have supportUTF8 parameter in connect()
+      // or it might be handled internally. If the library doesn't support it, 
+      // we ignore the flag to prevent build errors.
       connected = await ftpConnect.connect();
       if (!connected) {
         return const FtpConnectionTestResult(

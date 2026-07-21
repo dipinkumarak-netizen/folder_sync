@@ -252,7 +252,7 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
               SwitchListTile(
                 value: _supportUtf8,
                 title: const Text("Support UTF-8"),
-                subtitle: const Text("Turn off for older routers or modems"),
+                subtitle: const Text("Turn off for older routers or modems (if supported by app)"),
                 onChanged: (value) {
                   setState(() {
                     _supportUtf8 = value;

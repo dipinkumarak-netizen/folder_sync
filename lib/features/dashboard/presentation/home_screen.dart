@@ -25,10 +25,6 @@ class HomeScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(AppSizes.paddingM),
         children: [
-          const _HeaderSection(),
-
-          const SizedBox(height: AppSizes.paddingL),
-
           const SystemStatusCard(),
 
           const SizedBox(height: AppSizes.paddingM),
@@ -126,32 +122,6 @@ class HomeScreen extends StatelessWidget {
           ),
 
           const SizedBox(height: AppSizes.paddingXL),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeaderSection extends StatelessWidget {
-  const _HeaderSection();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSizes.paddingL),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(AppSizes.radiusL),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        children: [
-          const Icon(AppIcons.backup, size: 60, color: Colors.lightBlueAccent),
-          const SizedBox(height: AppSizes.paddingM),
-          Text(
-            AppStrings.appName,
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
         ],
       ),
     );
