@@ -3,6 +3,7 @@ import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:archive/archive_io.dart';
 import 'package:dartssh2/dartssh2.dart';
 import 'package:ftpconnect/ftpconnect.dart';
 import 'package:path/path.dart' as path;
@@ -196,6 +197,14 @@ class BackupMemoryRepository {
     var bytesBackedUp = 0;
 
     try {
+      if (job.compressBeforeUpload) {
+        return _runCompressedBackup(
+          job: job,
+          ftpServer: ftpServer,
+          onProgress: onProgress,
+        );
+      }
+
       connected = await ftpConnect.connect();
       if (!connected) {
         return BackupRunResult(
@@ -507,6 +516,129 @@ class BackupMemoryRepository {
         await sftp.stat(current);
       } catch (_) {
         await sftp.mkdir(current);
+      }
+    }
+  }
+
+  // ==========================================================
+  // Compressed Backup
+  // ==========================================================
+
+  Future<BackupRunResult> _runCompressedBackup({
+    required BackupJobModel job,
+    required FtpServerModel ftpServer,
+    BackupProgressCallback? onProgress,
+  }) async {
+    final localDirectory = Directory(job.localFolderPath);
+    final tempDir = await getTemporaryDirectory();
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final zipFileName = '${job.name.replaceAll(' ', '_')}_$timestamp.zip';
+    final zipFile = File('${tempDir.path}/$zipFileName');
+
+    try {
+      final encoder = ZipFileEncoder();
+      encoder.create(zipFile.path);
+
+      final List<File> filesToZip = await _collectPendingFiles(localDirectory, job);
+      if (filesToZip.isEmpty) {
+        return BackupRunResult(
+          success: true,
+          message: 'No new files to compress.',
+          filesBackedUp: 0,
+          bytesBackedUp: 0,
+          backedUpRelativePaths: job.backedUpRelativePaths,
+        );
+      }
+
+      for (var i = 0; i < filesToZip.length; i++) {
+        final file = filesToZip[i];
+        final relPath = _relativeFilePath(localDirectory.path, file.path);
+        encoder.addFile(file, relPath);
+        
+        await onProgress?.call(BackupProgressUpdate(
+          currentFileIndex: i + 1,
+          totalFiles: filesToZip.length,
+          currentFilePath: 'Compressing: $relPath',
+          filesBackedUp: 0,
+          bytesBackedUp: 0,
+        ));
+      }
+      encoder.close();
+
+      // Now upload the single zip file
+      final success = await _uploadSingleFile(
+        file: zipFile,
+        remoteName: zipFileName,
+        job: job,
+        ftpServer: ftpServer,
+      );
+
+      if (success) {
+        final newPaths = [...job.backedUpRelativePaths];
+        newPaths.addAll(filesToZip.map((f) => _relativeFilePath(localDirectory.path, f.path)));
+        
+        await zipFile.delete();
+        return BackupRunResult(
+          success: true,
+          message: 'Compressed and backed up ${filesToZip.length} file(s).',
+          filesBackedUp: filesToZip.length,
+          bytesBackedUp: await zipFile.length(),
+          backedUpRelativePaths: newPaths..sort(),
+        );
+      } else {
+        throw StateError('Failed to upload compressed archive.');
+      }
+    } catch (e) {
+      if (await zipFile.exists()) await zipFile.delete();
+      return BackupRunResult(
+        success: false,
+        message: FailureMessage.from(e, operation: 'Compressed Backup'),
+        filesBackedUp: 0,
+        bytesBackedUp: 0,
+        backedUpRelativePaths: job.backedUpRelativePaths,
+      );
+    }
+  }
+
+  Future<bool> _uploadSingleFile({
+    required File file,
+    required String remoteName,
+    required BackupJobModel job,
+    required FtpServerModel ftpServer,
+  }) async {
+    if (ftpServer.protocol == ServerProtocol.sftp) {
+      SSHClient? client;
+      try {
+        client = SSHClient(
+          await SSHSocket.connect(ftpServer.host, ftpServer.port, timeout: const Duration(seconds: 20)),
+          username: ftpServer.username,
+          onPasswordRequest: () => ftpServer.password,
+        );
+        final sftp = await client.sftp();
+        final remoteRoot = _normalizeRemotePath(job.remoteFolderPath);
+        await _ensureSftpDirectory(sftp, remoteRoot);
+        
+        final remoteFile = await sftp.open(path.posix.join(remoteRoot, remoteName), 
+            mode: SftpFileOpenMode.create | SftpFileOpenMode.write);
+        await remoteFile.write(file.openRead().cast());
+        client.close();
+        return true;
+      } catch (_) {
+        client?.close();
+        return false;
+      }
+    } else {
+      final ftpConnect = FTPConnect(ftpServer.host, port: ftpServer.port,
+          user: ftpServer.isAnonymous ? 'anonymous' : ftpServer.username,
+          pass: ftpServer.isAnonymous ? '' : ftpServer.password);
+      try {
+        await ftpConnect.connect();
+        await _changeOrCreateRemoteDirectory(ftpConnect, _normalizeRemotePath(job.remoteFolderPath));
+        final success = await ftpConnect.uploadFile(file, sRemoteName: remoteName);
+        await ftpConnect.disconnect();
+        return success;
+      } catch (_) {
+        return false;
       }
     }
   }

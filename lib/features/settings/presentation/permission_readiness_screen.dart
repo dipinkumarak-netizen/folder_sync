@@ -25,7 +25,7 @@ class PermissionReadinessScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Readiness Check'),
+        title: const Text('Permission Check'),
         actions: [
           IconButton(
             tooltip: 'Refresh',
@@ -106,12 +106,12 @@ class _ReadinessSummary extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  snapshot.allReady ? 'Ready' : 'Needs Attention',
+                  snapshot.allReady ? 'All Permissions Ready' : 'Permissions Needed',
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: AppSizes.paddingXS),
                 Text(
-                  '${snapshot.readyCount}/${snapshot.items.length} checks ready',
+                  '${snapshot.readyCount}/${snapshot.items.length} permissions allowed',
                   style: Theme.of(
                     context,
                   ).textTheme.bodyMedium?.copyWith(color: AppColors.textHint),

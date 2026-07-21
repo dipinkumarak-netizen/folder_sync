@@ -51,7 +51,7 @@ class SettingsScreen extends ConsumerWidget {
                 value: settings.biometricLockEnabled,
                 onChanged: (value) async {
                   if (value) {
-                    final authenticated = await _authenticate(ref);
+                    final authenticated = await _authenticate(ref, context);
                     if (!authenticated) return;
                   }
                   await _updateSettings(
@@ -121,20 +121,39 @@ class SettingsScreen extends ConsumerWidget {
     await ref.read(schedulerProvider).refreshBackgroundSchedule();
   }
 
-  Future<bool> _authenticate(WidgetRef ref) async {
+  Future<bool> _authenticate(WidgetRef ref, BuildContext context) async {
     final auth = LocalAuthentication();
     try {
       final canCheck = await auth.canCheckBiometrics || await auth.isDeviceSupported();
-      if (!canCheck) return false;
+      if (!canCheck) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Biometrics not available on this device.')),
+          );
+        }
+        return false;
+      }
 
-      return await auth.authenticate(
+      final authenticated = await auth.authenticate(
         localizedReason: 'Authenticate to enable biometric lock',
         options: const AuthenticationOptions(
           stickyAuth: true,
           biometricOnly: true,
         ),
       );
-    } catch (_) {
+
+      if (!authenticated && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Authentication failed.')),
+        );
+      }
+      return authenticated;
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}')),
+        );
+      }
       return false;
     }
   }
@@ -146,7 +165,7 @@ class _ServerSection extends StatelessWidget {
     return _SettingsSection(
       icon: AppIcons.server,
       iconColor: Colors.blue,
-      title: 'Servers',
+      title: 'First Server',
       children: [
         _ActionSettingTile(
           title: 'Connections',
