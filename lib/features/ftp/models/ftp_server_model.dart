@@ -15,6 +15,8 @@ class FtpServerModel {
   final String remotePath;
   final bool isAnonymous;
   final bool isFavorite;
+  final bool usePassiveMode;
+  final bool supportUtf8;
 
   const FtpServerModel({
     required this.id,
@@ -26,6 +28,8 @@ class FtpServerModel {
     required this.remotePath,
     this.isAnonymous = false,
     this.isFavorite = false,
+    this.usePassiveMode = true,
+    this.supportUtf8 = true,
   });
 
   FtpServerModel copyWith({
@@ -38,6 +42,8 @@ class FtpServerModel {
     String? remotePath,
     bool? isAnonymous,
     bool? isFavorite,
+    bool? usePassiveMode,
+    bool? supportUtf8,
   }) {
     return FtpServerModel(
       id: id ?? this.id,
@@ -49,6 +55,8 @@ class FtpServerModel {
       remotePath: remotePath ?? this.remotePath,
       isAnonymous: isAnonymous ?? this.isAnonymous,
       isFavorite: isFavorite ?? this.isFavorite,
+      usePassiveMode: usePassiveMode ?? this.usePassiveMode,
+      supportUtf8: supportUtf8 ?? this.supportUtf8,
     );
   }
 
@@ -63,6 +71,8 @@ class FtpServerModel {
       'remotePath': remotePath,
       'isAnonymous': isAnonymous,
       'isFavorite': isFavorite,
+      'usePassiveMode': usePassiveMode,
+      'supportUtf8': supportUtf8,
     };
   }
 
@@ -77,6 +87,8 @@ class FtpServerModel {
       remotePath: json['remotePath'] as String? ?? '/',
       isAnonymous: json['isAnonymous'] as bool? ?? false,
       isFavorite: json['isFavorite'] as bool? ?? false,
+      usePassiveMode: json['usePassiveMode'] as bool? ?? true,
+      supportUtf8: json['supportUtf8'] as bool? ?? true,
     );
   }
 }

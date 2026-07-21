@@ -143,8 +143,15 @@ class FtpMemoryRepository {
         );
       }
 
+      // Some modems/routers land the user in a specific folder. 
+      // Let's check where we are.
+      try {
+        final currentDir = await ftpConnect.currentDirectory();
+        // If we want to log this or use it, we could.
+      } catch (_) {}
+
       final remotePath = server.remotePath.trim();
-      if (remotePath.isEmpty || remotePath == '/') {
+      if (remotePath.isEmpty || remotePath == '/' || remotePath == '.') {
         return const FtpConnectionTestResult(
           success: true,
           message: 'FTP connection successful.',
@@ -197,7 +204,16 @@ class FtpMemoryRepository {
       }
 
       final currentPath = _normalizeRemotePath(remotePath);
-      await _changeRemoteDirectory(ftpConnect, currentPath);
+      
+      // Attempt to change directory. If it fails, we might already be there 
+      // or the server has a weird root.
+      try {
+        await _changeRemoteDirectory(ftpConnect, currentPath);
+      } catch (e) {
+        // If we are at root and CWD / fails, ignore it for routers
+        if (currentPath != '/') rethrow;
+      }
+
       final entries = await ftpConnect.listDirectoryContent();
       final folders =
           entries
@@ -290,14 +306,28 @@ class FtpMemoryRepository {
   ) async {
     final normalizedPath = _normalizeRemotePath(remotePath);
     if (normalizedPath == '/' || normalizedPath == '.') {
+      // For routers, try to go to the real root, but don't crash if it fails
+      try {
+        await ftpConnect.changeDirectory('/');
+      } catch (_) {}
       return;
     }
 
+    // Try absolute path first
     if (normalizedPath.startsWith('/')) {
-      final changed = await ftpConnect.changeDirectory(normalizedPath);
-      if (changed) {
-        return;
+      try {
+        final changed = await ftpConnect.changeDirectory(normalizedPath);
+        if (changed) {
+          return;
+        }
+      } catch (_) {
+        // Fallback to stepping through
       }
+      
+      // If absolute fails, go to root and then step
+      try {
+        await ftpConnect.changeDirectory('/');
+      } catch (_) {}
     }
 
     final parts = normalizedPath
@@ -306,9 +336,10 @@ class FtpMemoryRepository {
         .toList();
 
     for (final part in parts) {
+      if (part.isEmpty) continue;
       final changed = await ftpConnect.changeDirectory(part);
       if (!changed) {
-        throw StateError('Could not open remote folder $part.');
+        throw StateError('Could not open remote folder "$part".');
       }
     }
   }

@@ -680,12 +680,16 @@ class RestoreRepository {
   ) async {
     final normalizedPath = _normalizeRemotePath(remotePath);
     if (normalizedPath == '/' || normalizedPath == '.') {
-      await ftpConnect.changeDirectory('/');
+      try {
+        await ftpConnect.changeDirectory('/');
+      } catch (_) {}
       return;
     }
 
     if (normalizedPath.startsWith('/')) {
-      await ftpConnect.changeDirectory('/');
+      try {
+        await ftpConnect.changeDirectory('/');
+      } catch (_) {}
     }
 
     final parts = normalizedPath
@@ -694,9 +698,10 @@ class RestoreRepository {
         .toList();
 
     for (final part in parts) {
+      if (part.isEmpty) continue;
       final changed = await ftpConnect.changeDirectory(part);
       if (!changed) {
-        throw StateError('Could not open remote folder $part.');
+        throw StateError('Could not open remote folder "$part".');
       }
     }
   }

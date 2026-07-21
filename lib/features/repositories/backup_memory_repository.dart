@@ -314,12 +314,16 @@ class BackupMemoryRepository {
   ) async {
     final normalizedPath = _normalizeRemotePath(remotePath);
     if (normalizedPath == '/' || normalizedPath == '.') {
-      await ftpConnect.changeDirectory('/');
+      try {
+        await ftpConnect.changeDirectory('/');
+      } catch (_) {}
       return;
     }
 
     if (normalizedPath.startsWith('/')) {
-      await ftpConnect.changeDirectory('/');
+      try {
+        await ftpConnect.changeDirectory('/');
+      } catch (_) {}
     }
 
     final parts = normalizedPath
@@ -328,16 +332,17 @@ class BackupMemoryRepository {
         .toList();
 
     for (final part in parts) {
+      if (part.isEmpty) continue;
       final changed = await ftpConnect.changeDirectory(part);
       if (!changed) {
         final created = await ftpConnect.makeDirectory(part);
         if (!created) {
-          throw StateError('Could not create remote folder $part.');
+          throw StateError('Could not create remote folder "$part".');
         }
 
         final changedAfterCreate = await ftpConnect.changeDirectory(part);
         if (!changedAfterCreate) {
-          throw StateError('Could not open remote folder $part.');
+          throw StateError('Could not open remote folder "$part".');
         }
       }
     }

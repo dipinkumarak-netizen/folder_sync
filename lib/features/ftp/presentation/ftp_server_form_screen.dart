@@ -38,6 +38,7 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
   bool _anonymousLogin = false;
   bool _showPassword = false;
   bool _isTestingConnection = false;
+  bool _supportUtf8 = true;
 
   bool get _isEditing => widget.server != null;
 
@@ -57,6 +58,7 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
     _passwordController.text = server.password;
     _remotePathController.text = server.remotePath;
     _anonymousLogin = server.isAnonymous;
+    _supportUtf8 = server.supportUtf8;
   }
 
   @override
@@ -94,6 +96,7 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
       remotePath: remotePath.isEmpty ? '/' : remotePath,
       isAnonymous: _anonymousLogin,
       isFavorite: widget.server?.isFavorite ?? false,
+      supportUtf8: _supportUtf8,
     );
   }
 
@@ -242,6 +245,17 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
                 onChanged: (value) {
                   setState(() {
                     _anonymousLogin = value;
+                  });
+                },
+              ),
+              const SizedBox(height: AppSizes.paddingS),
+              SwitchListTile(
+                value: _supportUtf8,
+                title: const Text("Support UTF-8"),
+                subtitle: const Text("Turn off for older routers or modems"),
+                onChanged: (value) {
+                  setState(() {
+                    _supportUtf8 = value;
                   });
                 },
               ),
