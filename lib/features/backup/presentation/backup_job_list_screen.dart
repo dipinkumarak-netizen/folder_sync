@@ -489,6 +489,7 @@ class _BackupJobTile extends ConsumerWidget {
       BackupScheduleRule.manualOnly => 'Manual',
       BackupScheduleRule.hourly => 'Hourly',
       BackupScheduleRule.daily => 'Daily',
+      BackupScheduleRule.onHomeWifi => 'Home Wi-Fi',
     };
   }
 

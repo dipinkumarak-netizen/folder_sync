@@ -304,6 +304,7 @@ class _ScheduleDropdown extends StatelessWidget {
       BackupScheduleRule.manualOnly => 'Manual Only',
       BackupScheduleRule.hourly => 'Hourly',
       BackupScheduleRule.daily => 'Daily',
+      BackupScheduleRule.onHomeWifi => 'On Home Wi-Fi',
     };
   }
 }

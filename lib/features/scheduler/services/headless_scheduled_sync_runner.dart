@@ -79,7 +79,7 @@ class HeadlessScheduledSyncRunner {
       }
 
       checkedJobs += 1;
-      if (!_shouldRunBackupJob(job)) {
+      if (!await _shouldRunBackupJob(job)) {
         continue;
       }
 
@@ -216,7 +216,7 @@ class HeadlessScheduledSyncRunner {
     );
   }
 
-  bool _shouldRunBackupJob(BackupJobModel job) {
+  Future<bool> _shouldRunBackupJob(BackupJobModel job) async {
     if (!job.enabled || job.status == BackupJobStatus.running) {
       return false;
     }
@@ -230,6 +230,10 @@ class HeadlessScheduledSyncRunner {
       BackupScheduleRule.daily => _isDue(
         job.lastRunAt,
         const Duration(days: 1),
+      ),
+      BackupScheduleRule.onHomeWifi => _isDue(
+        job.lastRunAt,
+        _homeWifiMinimumInterval,
       ),
     };
   }

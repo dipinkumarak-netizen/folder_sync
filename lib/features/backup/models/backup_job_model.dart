@@ -7,7 +7,7 @@
 
 enum BackupJobStatus { idle, running, success, failed }
 
-enum BackupScheduleRule { manualOnly, hourly, daily }
+enum BackupScheduleRule { manualOnly, hourly, daily, onHomeWifi }
 
 class BackupJobModel {
   final String id;

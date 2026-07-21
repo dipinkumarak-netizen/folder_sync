@@ -85,7 +85,7 @@ class SchedulerService {
   Future<void> _runDueBackupJobs(List<FtpServerModel> ftpServers) async {
     final jobs = _ref.read(backupJobProvider);
     for (final job in jobs) {
-      if (!_shouldRunBackupJob(job)) {
+      if (!await _shouldRunBackupJob(job)) {
         continue;
       }
 
@@ -135,7 +135,7 @@ class SchedulerService {
     await _ref.read(syncRuleProvider.notifier).loadRules();
   }
 
-  bool _shouldRunBackupJob(BackupJobModel job) {
+  Future<bool> _shouldRunBackupJob(BackupJobModel job) async {
     if (!job.enabled ||
         job.status == BackupJobStatus.running ||
         _runningJobIds.contains(job.id)) {
@@ -152,6 +152,7 @@ class SchedulerService {
         job.lastRunAt,
         const Duration(days: 1),
       ),
+      BackupScheduleRule.onHomeWifi => _isHomeWifiBackupDue(job),
     };
   }
 
@@ -238,6 +239,17 @@ class SchedulerService {
     final expectedSsid = rule.homeWifiName.trim();
     if (expectedSsid.isEmpty ||
         !_isDue(rule.lastRunAt, _homeWifiMinimumInterval)) {
+      return false;
+    }
+
+    final currentSsid = await WifiStatusService.currentSsid();
+    return currentSsid == expectedSsid;
+  }
+
+  Future<bool> _isHomeWifiBackupDue(BackupJobModel job) async {
+    final expectedSsid = job.homeWifiName.trim();
+    if (expectedSsid.isEmpty ||
+        !_isDue(job.lastRunAt, _homeWifiMinimumInterval)) {
       return false;
     }
 
