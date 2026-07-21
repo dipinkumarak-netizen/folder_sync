@@ -21,32 +21,25 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(centerTitle: true, title: Text(AppStrings.appName)),
+      appBar: AppBar(
+        centerTitle: true,
+        title: Text(AppStrings.appName),
+        leading: IconButton(
+          icon: const Icon(AppIcons.settings),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            );
+          },
+        ),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(AppSizes.paddingM),
         children: [
           const SystemStatusCard(),
 
-          const SizedBox(height: AppSizes.paddingM),
-
-          const ReadinessStatusCard(),
-
           const SizedBox(height: AppSizes.paddingL),
-
-          DashboardCard(
-            icon: AppIcons.server,
-            iconColor: Colors.blue,
-            title: 'FTP Server',
-            subtitle: 'Configure FTP connections',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const FtpServerListScreen()),
-              );
-            },
-          ),
-
-          const SizedBox(height: AppSizes.paddingM),
 
           DashboardCard(
             icon: AppIcons.backup,
@@ -102,21 +95,6 @@ class HomeScreen extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const HistoryScreen()),
-              );
-            },
-          ),
-
-          const SizedBox(height: AppSizes.paddingM),
-
-          DashboardCard(
-            icon: AppIcons.settings,
-            iconColor: Colors.red,
-            title: 'Settings',
-            subtitle: 'Application settings',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SettingsScreen()),
               );
             },
           ),

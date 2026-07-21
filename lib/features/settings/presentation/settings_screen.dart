@@ -12,6 +12,7 @@ import '../../scheduler/providers/scheduler_provider.dart';
 import '../models/app_settings_model.dart';
 import '../providers/app_settings_provider.dart';
 import 'permission_readiness_screen.dart';
+import '../../ftp/presentation/ftp_server_list_screen.dart';
 
 /// ===============================================================
 /// OpenBackup
@@ -78,6 +79,8 @@ class SettingsScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: AppSizes.paddingM),
+          _ServerSection(),
+          const SizedBox(height: AppSizes.paddingM),
           _PermissionsSection(settings: settings),
           const SizedBox(height: AppSizes.paddingM),
           _DataSection(),
@@ -92,6 +95,30 @@ class SettingsScreen extends ConsumerWidget {
   Future<void> _updateSettings(WidgetRef ref, AppSettingsModel settings) async {
     await ref.read(appSettingsProvider.notifier).updateSettings(settings);
     await ref.read(schedulerProvider).refreshBackgroundSchedule();
+  }
+}
+
+class _ServerSection extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return _SettingsSection(
+      icon: AppIcons.server,
+      iconColor: Colors.blue,
+      title: 'FTP Connections',
+      children: [
+        _ActionSettingTile(
+          title: 'FTP Servers',
+          subtitle: 'Configure and manage your FTP server connections.',
+          actionLabel: 'Manage',
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const FtpServerListScreen()),
+            );
+          },
+        ),
+      ],
+    );
   }
 }
 
@@ -125,7 +152,7 @@ class _PermissionsSection extends ConsumerWidget {
         ),
         const Divider(height: AppSizes.paddingL),
         _ActionSettingTile(
-          title: 'Readiness Check',
+          title: 'Permission Check',
           subtitle:
               'Review storage, notification, Wi-Fi, and battery readiness.',
           actionLabel: 'Open',
