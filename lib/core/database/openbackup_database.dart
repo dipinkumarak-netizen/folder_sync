@@ -16,6 +16,7 @@ class OpenBackupDatabase {
   static const String ftpServersTable = 'ftp_servers';
   static const String backupJobsTable = 'backup_jobs';
   static const String syncRulesTable = 'sync_rules';
+  static const String historyEntriesTable = 'history_entries';
 
   Database? _database;
 
@@ -28,11 +29,12 @@ class OpenBackupDatabase {
     final databasePath = await getDatabasesPath();
     final db = await openDatabase(
       path.join(databasePath, 'openbackup.db'),
-      version: 3,
+      version: 4,
       onCreate: (database, version) async {
         await _createFtpServersTable(database);
         await _createBackupJobsTable(database);
         await _createSyncRulesTable(database);
+        await _createHistoryEntriesTable(database);
       },
       onUpgrade: (database, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -40,6 +42,9 @@ class OpenBackupDatabase {
         }
         if (oldVersion < 3) {
           await _createSyncRulesTable(database);
+        }
+        if (oldVersion < 4) {
+          await _createHistoryEntriesTable(database);
         }
       },
     );
@@ -119,6 +124,25 @@ class OpenBackupDatabase {
         last_files_changed INTEGER NOT NULL,
         total_files_changed INTEGER NOT NULL,
         total_bytes_changed INTEGER NOT NULL
+      )
+    ''');
+  }
+
+  Future<void> _createHistoryEntriesTable(Database database) async {
+    await database.execute('''
+      CREATE TABLE $historyEntriesTable (
+        id TEXT PRIMARY KEY,
+        operation_type TEXT NOT NULL,
+        status TEXT NOT NULL,
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        source_path TEXT NOT NULL,
+        target_path TEXT NOT NULL,
+        related_id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        files_changed INTEGER NOT NULL,
+        bytes_changed INTEGER NOT NULL,
+        file_reports TEXT NOT NULL
       )
     ''');
   }

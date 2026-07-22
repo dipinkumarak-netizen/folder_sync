@@ -152,6 +152,7 @@ Primary target:
 
 - History Entry Model
 - Local History Persistence
+- SQLite History Persistence
 - History Screen
 - History Detail Screen
 - Per-Run File Report Foundation
@@ -205,8 +206,8 @@ Next action:
 
 ## Remaining Feature Inventory
 
-- SQLite persistence migration has started. FTP servers, backup jobs, and sync
-  rules use SQLite; history and settings still use JSON-backed storage.
+- SQLite persistence migration has started. FTP servers, backup jobs, sync
+  rules, and history use SQLite; settings still use JSON-backed storage.
 - Android release application ID is `com.openbackup.app`.
 - Release signing uses local `android/key.properties` or
   `OPENBACKUP_UPLOAD_*` environment variables. Real keystore secrets are not
@@ -222,7 +223,7 @@ Reason:
 
 - The build is currently green, feature documentation is current, and release
   signing no longer falls back to debug keys.
-- Move history and settings onto the shared SQLite database foundation.
+- Move settings onto the shared SQLite database foundation.
 
 ---
 
