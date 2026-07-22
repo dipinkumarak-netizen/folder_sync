@@ -123,8 +123,9 @@ OPENBACKUP_UPLOAD_KEY_PASSWORD
 
 - Release signing requires local keystore values before building distributable
   release artifacts.
-- SQLite persistence migration has started. FTP server records and backup jobs
-  use SQLite; sync rules, history, and settings still use JSON-backed storage.
+- SQLite persistence migration has started. FTP server records, backup jobs,
+  and sync rules use SQLite; history and settings still use JSON-backed
+  storage.
 - Kotlin Gradle Plugin migration warning appears for some third-party plugins
   during debug builds. The current dependency set builds successfully, and the
   migration is deferred until compatible plugin versions are aligned.

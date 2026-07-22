@@ -15,6 +15,7 @@ class OpenBackupDatabase {
 
   static const String ftpServersTable = 'ftp_servers';
   static const String backupJobsTable = 'backup_jobs';
+  static const String syncRulesTable = 'sync_rules';
 
   Database? _database;
 
@@ -27,14 +28,18 @@ class OpenBackupDatabase {
     final databasePath = await getDatabasesPath();
     final db = await openDatabase(
       path.join(databasePath, 'openbackup.db'),
-      version: 2,
+      version: 3,
       onCreate: (database, version) async {
         await _createFtpServersTable(database);
         await _createBackupJobsTable(database);
+        await _createSyncRulesTable(database);
       },
       onUpgrade: (database, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await _createBackupJobsTable(database);
+        }
+        if (oldVersion < 3) {
+          await _createSyncRulesTable(database);
         }
       },
     );
@@ -83,6 +88,37 @@ class OpenBackupDatabase {
         total_files_backed_up INTEGER NOT NULL,
         total_bytes_backed_up INTEGER NOT NULL,
         backed_up_relative_paths TEXT NOT NULL
+      )
+    ''');
+  }
+
+  Future<void> _createSyncRulesTable(Database database) async {
+    await database.execute('''
+      CREATE TABLE $syncRulesTable (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        local_folder_path TEXT NOT NULL,
+        ftp_server_id TEXT NOT NULL,
+        remote_folder_path TEXT NOT NULL,
+        enabled INTEGER NOT NULL,
+        direction TEXT NOT NULL,
+        conflict_rule TEXT NOT NULL,
+        delete_rule TEXT NOT NULL,
+        trigger_rule TEXT NOT NULL,
+        sync_subfolders INTEGER NOT NULL,
+        include_hidden_files INTEGER NOT NULL,
+        run_on_wifi_only INTEGER NOT NULL,
+        run_only_while_charging INTEGER NOT NULL,
+        home_wifi_name TEXT NOT NULL,
+        include_patterns TEXT NOT NULL,
+        exclude_patterns TEXT NOT NULL,
+        max_file_size_mb INTEGER,
+        status TEXT NOT NULL,
+        last_run_at TEXT,
+        last_message TEXT NOT NULL,
+        last_files_changed INTEGER NOT NULL,
+        total_files_changed INTEGER NOT NULL,
+        total_bytes_changed INTEGER NOT NULL
       )
     ''');
   }

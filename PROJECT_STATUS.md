@@ -89,6 +89,7 @@ Primary target:
 - Remote Folder Picker
 - Wi-Fi Only and Home Wi-Fi Rules
 - Local Sync Rule Persistence
+- SQLite Sync Rule Persistence
 - Manual Sync Runner
 - In-App Instant Sync Trigger
 - Android Native Instant Sync Foreground Watcher
@@ -204,8 +205,8 @@ Next action:
 
 ## Remaining Feature Inventory
 
-- SQLite persistence migration has started. FTP servers and backup jobs use
-  SQLite; sync rules, history, and settings still use JSON-backed storage.
+- SQLite persistence migration has started. FTP servers, backup jobs, and sync
+  rules use SQLite; history and settings still use JSON-backed storage.
 - Android release application ID is `com.openbackup.app`.
 - Release signing uses local `android/key.properties` or
   `OPENBACKUP_UPLOAD_*` environment variables. Real keystore secrets are not
@@ -221,8 +222,7 @@ Reason:
 
 - The build is currently green, feature documentation is current, and release
   signing no longer falls back to debug keys.
-- Move sync rules, history, and settings onto the shared SQLite database
-  foundation.
+- Move history and settings onto the shared SQLite database foundation.
 
 ---
 

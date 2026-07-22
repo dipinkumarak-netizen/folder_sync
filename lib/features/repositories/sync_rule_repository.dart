@@ -8,7 +8,9 @@ import 'package:ftpconnect/ftpconnect.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
+import 'package:sqflite/sqflite.dart';
 
+import '../../core/database/openbackup_database.dart';
 import '../../core/utils/failure_message.dart';
 import '../ftp/models/ftp_server_model.dart';
 import '../sync/models/sync_rule_model.dart';
@@ -136,26 +138,29 @@ class SyncRuleRepository {
     _loaded = true;
 
     try {
-      final file = await _storageFile().timeout(const Duration(seconds: 1));
-      if (!await file.exists()) {
+      final database = await OpenBackupDatabase.instance.database;
+      final storedRules = await _loadFromDatabase(database);
+      if (storedRules.isNotEmpty) {
+        _rules
+          ..clear()
+          ..addAll(storedRules);
         return;
       }
 
-      final decoded = jsonDecode(await file.readAsString());
-      if (decoded is! List) {
+      final legacyRules = await _loadFromJson();
+      if (legacyRules.isEmpty) {
         return;
       }
 
       _rules
         ..clear()
-        ..addAll(
-          decoded
-              .whereType<Map<String, dynamic>>()
-              .map(SyncRuleModel.fromJson)
-              .where((rule) => rule.id.isNotEmpty),
-        );
+        ..addAll(legacyRules);
+      await _saveToDatabase(database);
     } catch (_) {
-      return;
+      final legacyRules = await _loadFromJson();
+      _rules
+        ..clear()
+        ..addAll(legacyRules);
     }
   }
 
@@ -1697,11 +1702,150 @@ class SyncRuleRepository {
 
   Future<void> _save() async {
     try {
+      final database = await OpenBackupDatabase.instance.database;
+      await _saveToDatabase(database);
+      return;
+    } catch (_) {
+      await _saveToJson();
+    }
+  }
+
+  Future<List<SyncRuleModel>> _loadFromDatabase(Database database) async {
+    final rows = await database.query(
+      OpenBackupDatabase.syncRulesTable,
+      orderBy: 'name COLLATE NOCASE ASC',
+    );
+    return rows.map(_ruleFromRow).where((rule) => rule.id.isNotEmpty).toList();
+  }
+
+  Future<void> _saveToDatabase(Database database) async {
+    await database.transaction((transaction) async {
+      await transaction.delete(OpenBackupDatabase.syncRulesTable);
+      for (final rule in _rules) {
+        await transaction.insert(
+          OpenBackupDatabase.syncRulesTable,
+          _ruleToRow(rule),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+    });
+  }
+
+  Future<List<SyncRuleModel>> _loadFromJson() async {
+    try {
+      final file = await _storageFile().timeout(const Duration(seconds: 1));
+      if (!await file.exists()) {
+        return const [];
+      }
+
+      final decoded = jsonDecode(await file.readAsString());
+      if (decoded is! List) {
+        return const [];
+      }
+
+      return decoded
+          .whereType<Map<String, dynamic>>()
+          .map(SyncRuleModel.fromJson)
+          .where((rule) => rule.id.isNotEmpty)
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<void> _saveToJson() async {
+    try {
       final file = await _storageFile();
       final encoded = jsonEncode(_rules.map((rule) => rule.toJson()).toList());
       await file.writeAsString(encoded);
     } catch (_) {
       return;
     }
+  }
+
+  Map<String, Object?> _ruleToRow(SyncRuleModel rule) {
+    return {
+      'id': rule.id,
+      'name': rule.name,
+      'local_folder_path': rule.localFolderPath,
+      'ftp_server_id': rule.ftpServerId,
+      'remote_folder_path': rule.remoteFolderPath,
+      'enabled': rule.enabled ? 1 : 0,
+      'direction': rule.direction.name,
+      'conflict_rule': rule.conflictRule.name,
+      'delete_rule': rule.deleteRule.name,
+      'trigger_rule': rule.triggerRule.name,
+      'sync_subfolders': rule.syncSubfolders ? 1 : 0,
+      'include_hidden_files': rule.includeHiddenFiles ? 1 : 0,
+      'run_on_wifi_only': rule.runOnWifiOnly ? 1 : 0,
+      'run_only_while_charging': rule.runOnlyWhileCharging ? 1 : 0,
+      'home_wifi_name': rule.homeWifiName,
+      'include_patterns': rule.includePatterns,
+      'exclude_patterns': rule.excludePatterns,
+      'max_file_size_mb': rule.maxFileSizeMb,
+      'status': rule.status.name,
+      'last_run_at': rule.lastRunAt?.toIso8601String(),
+      'last_message': rule.lastMessage,
+      'last_files_changed': rule.lastFilesChanged,
+      'total_files_changed': rule.totalFilesChanged,
+      'total_bytes_changed': rule.totalBytesChanged,
+    };
+  }
+
+  SyncRuleModel _ruleFromRow(Map<String, Object?> row) {
+    return SyncRuleModel(
+      id: row['id'] as String? ?? '',
+      name: row['name'] as String? ?? '',
+      localFolderPath: row['local_folder_path'] as String? ?? '',
+      ftpServerId: row['ftp_server_id'] as String? ?? '',
+      remoteFolderPath: row['remote_folder_path'] as String? ?? '/',
+      enabled: _boolFromInt(row['enabled'], fallback: true),
+      direction: SyncDirection.values.firstWhere(
+        (direction) => direction.name == row['direction'],
+        orElse: () => SyncDirection.twoWay,
+      ),
+      conflictRule: SyncConflictRule.values.firstWhere(
+        (rule) => rule.name == row['conflict_rule'],
+        orElse: () => SyncConflictRule.newerWins,
+      ),
+      deleteRule: SyncDeleteRule.values.firstWhere(
+        (rule) => rule.name == row['delete_rule'],
+        orElse: () => SyncDeleteRule.keepDeletedFiles,
+      ),
+      triggerRule: SyncTriggerRule.values.firstWhere(
+        (rule) => rule.name == row['trigger_rule'],
+        orElse: () => SyncTriggerRule.manualOnly,
+      ),
+      syncSubfolders: _boolFromInt(row['sync_subfolders'], fallback: true),
+      includeHiddenFiles: _boolFromInt(row['include_hidden_files']),
+      runOnWifiOnly: _boolFromInt(row['run_on_wifi_only'], fallback: true),
+      runOnlyWhileCharging: _boolFromInt(row['run_only_while_charging']),
+      homeWifiName: row['home_wifi_name'] as String? ?? '',
+      includePatterns: row['include_patterns'] as String? ?? '*',
+      excludePatterns: row['exclude_patterns'] as String? ?? '',
+      maxFileSizeMb: row['max_file_size_mb'] as int?,
+      status: _statusFromRow(row['status']),
+      lastRunAt: DateTime.tryParse(row['last_run_at'] as String? ?? ''),
+      lastMessage: row['last_message'] as String? ?? 'Not run yet',
+      lastFilesChanged: row['last_files_changed'] as int? ?? 0,
+      totalFilesChanged: row['total_files_changed'] as int? ?? 0,
+      totalBytesChanged: row['total_bytes_changed'] as int? ?? 0,
+    );
+  }
+
+  SyncRuleStatus _statusFromRow(Object? value) {
+    final status = SyncRuleStatus.values.firstWhere(
+      (status) => status.name == value,
+      orElse: () => SyncRuleStatus.idle,
+    );
+    return status == SyncRuleStatus.running ? SyncRuleStatus.idle : status;
+  }
+
+  bool _boolFromInt(Object? value, {bool fallback = false}) {
+    if (value is int) {
+      return value == 1;
+    }
+
+    return fallback;
   }
 }
