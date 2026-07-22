@@ -14,76 +14,89 @@ import 'ob_card.dart';
 /// ===============================================================
 
 class TransferStatusBar extends StatelessWidget {
-  const TransferStatusBar({super.key, required this.progress});
+  const TransferStatusBar({
+    super.key,
+    required this.progress,
+    this.embedded = false,
+  });
 
   final TransferProgressSnapshot progress;
+  final bool embedded;
 
   @override
   Widget build(BuildContext context) {
-    final progressValue = progress.progress;
+    final progressValue = progress.progress ?? 0;
 
-    return OBCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 22,
-                backgroundColor: AppColors.info.withValues(alpha: 0.15),
-                child: const Icon(AppIcons.sync, color: AppColors.info),
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            CircleAvatar(
+              radius: 22,
+              backgroundColor: AppColors.info.withValues(alpha: 0.15),
+              child: const Icon(AppIcons.sync, color: AppColors.info),
+            ),
+            const SizedBox(width: AppSizes.paddingM),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    progress.title,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: AppSizes.paddingXS),
+                  Text(
+                    progress.status,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: AppColors.textHint),
+                  ),
+                ],
               ),
-              const SizedBox(width: AppSizes.paddingM),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      progress.title,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: AppSizes.paddingXS),
-                    Text(
-                      progress.status,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textHint,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Text(
-                _fileCountLabel(progress),
-                style: Theme.of(context).textTheme.labelLarge,
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSizes.paddingM),
-          LinearProgressIndicator(value: progressValue),
-          const SizedBox(height: AppSizes.paddingS),
-          Wrap(
-            spacing: AppSizes.paddingS,
-            runSpacing: AppSizes.paddingS,
-            children: [
+            ),
+            Text(
+              _percentageLabel(progress),
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSizes.paddingM),
+        LinearProgressIndicator(value: progressValue),
+        const SizedBox(height: AppSizes.paddingS),
+        Wrap(
+          spacing: AppSizes.paddingS,
+          runSpacing: AppSizes.paddingS,
+          children: [
+            _ProgressChip(
+              label: _formatBytes(progress.processedBytes),
+              color: AppColors.info,
+            ),
+            _ProgressChip(
+              label: _fileCountLabel(progress),
+              color: AppColors.warning,
+            ),
+            _ProgressChip(
+              label:
+                  '${_formatBytes(progress.averageBytesPerSecond.round())}/s LAN',
+              color: AppColors.success,
+            ),
+            if (progress.currentFilePath.isNotEmpty)
               _ProgressChip(
-                label: _formatBytes(progress.processedBytes),
-                color: AppColors.info,
+                label: progress.currentFilePath,
+                color: AppColors.textHint,
               ),
-              _ProgressChip(
-                label:
-                    '${_formatBytes(progress.averageBytesPerSecond.round())}/s LAN',
-                color: AppColors.success,
-              ),
-              if (progress.currentFilePath.isNotEmpty)
-                _ProgressChip(
-                  label: progress.currentFilePath,
-                  color: AppColors.textHint,
-                ),
-            ],
-          ),
-        ],
-      ),
+          ],
+        ),
+      ],
     );
+
+    if (embedded) {
+      return content;
+    }
+
+    return OBCard(child: content);
   }
 
   String _fileCountLabel(TransferProgressSnapshot progress) {
@@ -92,6 +105,11 @@ class TransferStatusBar extends StatelessWidget {
     }
 
     return '${progress.processedFiles}/${progress.totalFiles}';
+  }
+
+  String _percentageLabel(TransferProgressSnapshot progress) {
+    final value = progress.progress ?? 0;
+    return '${(value * 100).round()}%';
   }
 
   String _formatBytes(int bytes) {

@@ -51,12 +51,14 @@ class SyncProgressUpdate {
   final String currentFilePath;
   final String action;
   final int filesChanged;
+  final int totalFiles;
   final int bytesChanged;
 
   const SyncProgressUpdate({
     required this.currentFilePath,
     required this.action,
     required this.filesChanged,
+    required this.totalFiles,
     required this.bytesChanged,
   });
 }
@@ -196,7 +198,11 @@ class SyncRuleRepository {
     SyncProgressCallback? onProgress,
   }) async {
     if (ftpServer.protocol == ServerProtocol.sftp) {
-      return _runSftpSync(rule: rule, ftpServer: ftpServer, onProgress: onProgress);
+      return _runSftpSync(
+        rule: rule,
+        ftpServer: ftpServer,
+        onProgress: onProgress,
+      );
     }
 
     final localDirectory = Directory(rule.localFolderPath);
@@ -247,6 +253,11 @@ class SyncRuleRepository {
         remoteRoot: remoteRoot,
         rule: rule,
       );
+      final totalFiles = _countPendingSyncFiles(
+        localFiles: localFiles,
+        remoteFiles: remoteFiles,
+        rule: rule,
+      );
 
       var filesChanged = 0;
       var bytesChanged = 0;
@@ -260,6 +271,7 @@ class SyncRuleRepository {
           localFiles: localFiles,
           remoteFiles: remoteFiles,
           rule: rule,
+          totalFiles: totalFiles,
           onProgress: onProgress,
         );
         filesChanged += result.filesChanged;
@@ -277,6 +289,7 @@ class SyncRuleRepository {
           rule: rule,
           initialFilesChanged: filesChanged,
           initialBytesChanged: bytesChanged,
+          totalFiles: totalFiles,
           onProgress: onProgress,
         );
         filesChanged += result.filesChanged;
@@ -409,7 +422,11 @@ class SyncRuleRepository {
     SyncProgressCallback? onProgress,
   }) async {
     if (ftpServer.protocol == ServerProtocol.sftp) {
-      return _executeSftpProtectedDeletes(rule: rule, ftpServer: ftpServer, onProgress: onProgress);
+      return _executeSftpProtectedDeletes(
+        rule: rule,
+        ftpServer: ftpServer,
+        onProgress: onProgress,
+      );
     }
 
     final localDirectory = Directory(rule.localFolderPath);
@@ -498,6 +515,7 @@ class SyncRuleRepository {
             currentFilePath: item.relativePath,
             action: 'delete',
             filesChanged: filesChanged,
+            totalFiles: items.length,
             bytesChanged: bytesChanged,
           ),
         );
@@ -547,6 +565,7 @@ class SyncRuleRepository {
     required Map<String, _SyncFileEntry> localFiles,
     required Map<String, _SyncFileEntry> remoteFiles,
     required SyncRuleModel rule,
+    required int totalFiles,
     SyncProgressCallback? onProgress,
   }) async {
     var filesChanged = 0;
@@ -600,6 +619,7 @@ class SyncRuleRepository {
           currentFilePath: uploadName,
           action: 'upload',
           filesChanged: filesChanged,
+          totalFiles: totalFiles,
           bytesChanged: bytesChanged,
         ),
       );
@@ -623,6 +643,7 @@ class SyncRuleRepository {
     required SyncRuleModel rule,
     required int initialFilesChanged,
     required int initialBytesChanged,
+    required int totalFiles,
     SyncProgressCallback? onProgress,
   }) async {
     var filesChanged = 0;
@@ -676,6 +697,7 @@ class SyncRuleRepository {
           currentFilePath: remoteEntry.relativePath,
           action: 'download',
           filesChanged: initialFilesChanged + filesChanged,
+          totalFiles: totalFiles,
           bytesChanged: initialBytesChanged + bytesChanged,
         ),
       );
@@ -849,6 +871,62 @@ class SyncRuleRepository {
     }
 
     return sourceTime.isAfter(targetTime) && source.size != target.size;
+  }
+
+  int _countPendingSyncFiles({
+    required Map<String, _SyncFileEntry> localFiles,
+    required Map<String, _SyncFileEntry> remoteFiles,
+    required SyncRuleModel rule,
+  }) {
+    var totalFiles = 0;
+
+    if (_shouldUpload(rule.direction)) {
+      totalFiles += _countPendingUploads(localFiles, remoteFiles, rule);
+    }
+
+    if (_shouldDownload(rule.direction)) {
+      totalFiles += _countPendingDownloads(localFiles, remoteFiles, rule);
+    }
+
+    return totalFiles;
+  }
+
+  int _countPendingUploads(
+    Map<String, _SyncFileEntry> localFiles,
+    Map<String, _SyncFileEntry> remoteFiles,
+    SyncRuleModel rule,
+  ) {
+    var count = 0;
+    for (final localEntry in localFiles.values) {
+      if (_shouldTransferLocalToRemote(
+        localEntry,
+        remoteFiles[localEntry.relativePath],
+        rule.conflictRule,
+      )) {
+        count += 1;
+      }
+    }
+
+    return count;
+  }
+
+  int _countPendingDownloads(
+    Map<String, _SyncFileEntry> localFiles,
+    Map<String, _SyncFileEntry> remoteFiles,
+    SyncRuleModel rule,
+  ) {
+    var count = 0;
+    for (final remoteEntry in remoteFiles.values) {
+      if (_shouldTransferRemoteToLocal(
+        localFiles[remoteEntry.relativePath],
+        remoteEntry,
+        rule.conflictRule,
+      )) {
+        count += 1;
+      }
+    }
+
+    return count;
   }
 
   String _uploadName(
@@ -1154,13 +1232,22 @@ class SyncRuleRepository {
   }) async {
     final localDirectory = Directory(rule.localFolderPath);
     if (!await localDirectory.exists()) {
-      return const SyncRunResult(success: false, message: 'Local folder not found.', filesChanged: 0, bytesChanged: 0);
+      return const SyncRunResult(
+        success: false,
+        message: 'Local folder not found.',
+        filesChanged: 0,
+        bytesChanged: 0,
+      );
     }
 
     SSHClient? client;
     try {
       client = SSHClient(
-        await SSHSocket.connect(ftpServer.host, ftpServer.port, timeout: const Duration(seconds: 20)),
+        await SSHSocket.connect(
+          ftpServer.host,
+          ftpServer.port,
+          timeout: const Duration(seconds: 20),
+        ),
         username: ftpServer.username,
         onPasswordRequest: () => ftpServer.password,
       );
@@ -1170,7 +1257,16 @@ class SyncRuleRepository {
       await _ensureSftpDirectory(sftp, remoteRoot);
 
       final localFiles = await _collectLocalFiles(localDirectory, rule);
-      final remoteFiles = await _collectSftpFiles(sftp: sftp, remoteRoot: remoteRoot, rule: rule);
+      final remoteFiles = await _collectSftpFiles(
+        sftp: sftp,
+        remoteRoot: remoteRoot,
+        rule: rule,
+      );
+      final totalFiles = _countPendingSyncFiles(
+        localFiles: localFiles,
+        remoteFiles: remoteFiles,
+        rule: rule,
+      );
 
       var filesChanged = 0;
       var bytesChanged = 0;
@@ -1179,19 +1275,49 @@ class SyncRuleRepository {
       if (_shouldUpload(rule.direction)) {
         for (final localEntry in localFiles.values) {
           final remoteEntry = remoteFiles[localEntry.relativePath];
-          if (_shouldTransferLocalToRemote(localEntry, remoteEntry, rule.conflictRule)) {
-            final localFile = File(path.join(localDirectory.path, localEntry.relativePath));
-            final uploadName = _uploadName(localEntry.relativePath, remoteEntry, rule);
+          if (_shouldTransferLocalToRemote(
+            localEntry,
+            remoteEntry,
+            rule.conflictRule,
+          )) {
+            final localFile = File(
+              path.join(localDirectory.path, localEntry.relativePath),
+            );
+            final uploadName = _uploadName(
+              localEntry.relativePath,
+              remoteEntry,
+              rule,
+            );
             final uploadPath = path.posix.join(remoteRoot, uploadName);
             await _ensureSftpDirectory(sftp, path.posix.dirname(uploadPath));
-            
-            final remoteFile = await sftp.open(uploadPath, mode: SftpFileOpenMode.create | SftpFileOpenMode.write | SftpFileOpenMode.truncate);
+
+            final remoteFile = await sftp.open(
+              uploadPath,
+              mode:
+                  SftpFileOpenMode.create |
+                  SftpFileOpenMode.write |
+                  SftpFileOpenMode.truncate,
+            );
             await remoteFile.write(localFile.openRead().cast());
-            
+
             filesChanged++;
             bytesChanged += localEntry.size;
-            fileReports.add(SyncRunFileReport(relativePath: localEntry.relativePath, action: 'upload', size: localEntry.size));
-            await onProgress?.call(SyncProgressUpdate(currentFilePath: localEntry.relativePath, action: 'upload', filesChanged: filesChanged, bytesChanged: bytesChanged));
+            fileReports.add(
+              SyncRunFileReport(
+                relativePath: localEntry.relativePath,
+                action: 'upload',
+                size: localEntry.size,
+              ),
+            );
+            await onProgress?.call(
+              SyncProgressUpdate(
+                currentFilePath: localEntry.relativePath,
+                action: 'upload',
+                filesChanged: filesChanged,
+                totalFiles: totalFiles,
+                bytesChanged: bytesChanged,
+              ),
+            );
           }
         }
       }
@@ -1199,29 +1325,65 @@ class SyncRuleRepository {
       if (_shouldDownload(rule.direction)) {
         for (final remoteEntry in remoteFiles.values) {
           final localEntry = localFiles[remoteEntry.relativePath];
-          if (_shouldTransferRemoteToLocal(localEntry, remoteEntry, rule.conflictRule)) {
-            final localPath = _downloadPath(localDirectory.path, remoteEntry.relativePath, localEntry, rule);
+          if (_shouldTransferRemoteToLocal(
+            localEntry,
+            remoteEntry,
+            rule.conflictRule,
+          )) {
+            final localPath = _downloadPath(
+              localDirectory.path,
+              remoteEntry.relativePath,
+              localEntry,
+              rule,
+            );
             final localFile = File(localPath);
             await localFile.parent.create(recursive: true);
-            
-            final remoteFile = await sftp.open(path.posix.join(remoteRoot, remoteEntry.relativePath));
+
+            final remoteFile = await sftp.open(
+              path.posix.join(remoteRoot, remoteEntry.relativePath),
+            );
             final sink = localFile.openWrite();
             await sink.addStream(remoteFile.read());
             await sink.close();
 
             filesChanged++;
             bytesChanged += remoteEntry.size;
-            fileReports.add(SyncRunFileReport(relativePath: remoteEntry.relativePath, action: 'download', size: remoteEntry.size));
-            await onProgress?.call(SyncProgressUpdate(currentFilePath: remoteEntry.relativePath, action: 'download', filesChanged: filesChanged, bytesChanged: bytesChanged));
+            fileReports.add(
+              SyncRunFileReport(
+                relativePath: remoteEntry.relativePath,
+                action: 'download',
+                size: remoteEntry.size,
+              ),
+            );
+            await onProgress?.call(
+              SyncProgressUpdate(
+                currentFilePath: remoteEntry.relativePath,
+                action: 'download',
+                filesChanged: filesChanged,
+                totalFiles: totalFiles,
+                bytesChanged: bytesChanged,
+              ),
+            );
           }
         }
       }
 
       client.close();
-      return SyncRunResult(success: true, message: 'SFTP Sync completed.', filesChanged: filesChanged, bytesChanged: bytesChanged, fileReports: fileReports);
+      return SyncRunResult(
+        success: true,
+        message: 'SFTP Sync completed.',
+        filesChanged: filesChanged,
+        bytesChanged: bytesChanged,
+        fileReports: fileReports,
+      );
     } catch (error) {
       client?.close();
-      return SyncRunResult(success: false, message: FailureMessage.from(error, operation: 'SFTP Sync'), filesChanged: 0, bytesChanged: 0);
+      return SyncRunResult(
+        success: false,
+        message: FailureMessage.from(error, operation: 'SFTP Sync'),
+        filesChanged: 0,
+        bytesChanged: 0,
+      );
     }
   }
 
@@ -1232,19 +1394,40 @@ class SyncRuleRepository {
     SSHClient? client;
     try {
       client = SSHClient(
-        await SSHSocket.connect(ftpServer.host, ftpServer.port, timeout: const Duration(seconds: 20)),
+        await SSHSocket.connect(
+          ftpServer.host,
+          ftpServer.port,
+          timeout: const Duration(seconds: 20),
+        ),
         username: ftpServer.username,
         onPasswordRequest: () => ftpServer.password,
       );
       final sftp = await client.sftp();
       final remoteRoot = _normalizeRemotePath(rule.remoteFolderPath);
-      
-      final localFiles = await _collectLocalFiles(Directory(rule.localFolderPath), rule);
-      final remoteFiles = await _collectSftpFiles(sftp: sftp, remoteRoot: remoteRoot, rule: rule);
-      
-      final items = _sortedDeletePreviewItems(_collectDeletePreviewItems(rule: rule, localFiles: localFiles, remoteFiles: remoteFiles));
+
+      final localFiles = await _collectLocalFiles(
+        Directory(rule.localFolderPath),
+        rule,
+      );
+      final remoteFiles = await _collectSftpFiles(
+        sftp: sftp,
+        remoteRoot: remoteRoot,
+        rule: rule,
+      );
+
+      final items = _sortedDeletePreviewItems(
+        _collectDeletePreviewItems(
+          rule: rule,
+          localFiles: localFiles,
+          remoteFiles: remoteFiles,
+        ),
+      );
       client.close();
-      return SyncDeletePreviewResult(success: true, message: 'SFTP Delete preview ready.', items: items);
+      return SyncDeletePreviewResult(
+        success: true,
+        message: 'SFTP Delete preview ready.',
+        items: items,
+      );
     } catch (error) {
       client?.close();
       return SyncDeletePreviewResult(
@@ -1263,31 +1446,65 @@ class SyncRuleRepository {
     SSHClient? client;
     try {
       client = SSHClient(
-        await SSHSocket.connect(ftpServer.host, ftpServer.port, timeout: const Duration(seconds: 20)),
+        await SSHSocket.connect(
+          ftpServer.host,
+          ftpServer.port,
+          timeout: const Duration(seconds: 20),
+        ),
         username: ftpServer.username,
         onPasswordRequest: () => ftpServer.password,
       );
       final sftp = await client.sftp();
       final remoteRoot = _normalizeRemotePath(rule.remoteFolderPath);
-      
-      final localFiles = await _collectLocalFiles(Directory(rule.localFolderPath), rule);
-      final remoteFiles = await _collectSftpFiles(sftp: sftp, remoteRoot: remoteRoot, rule: rule);
-      final items = _sortedDeletePreviewItems(_collectDeletePreviewItems(rule: rule, localFiles: localFiles, remoteFiles: remoteFiles));
-      
+
+      final localFiles = await _collectLocalFiles(
+        Directory(rule.localFolderPath),
+        rule,
+      );
+      final remoteFiles = await _collectSftpFiles(
+        sftp: sftp,
+        remoteRoot: remoteRoot,
+        rule: rule,
+      );
+      final items = _sortedDeletePreviewItems(
+        _collectDeletePreviewItems(
+          rule: rule,
+          localFiles: localFiles,
+          remoteFiles: remoteFiles,
+        ),
+      );
+
       var filesChanged = 0;
       var bytesChanged = 0;
       final fileReports = <SyncRunFileReport>[];
 
       for (final item in items) {
         if (item.target == SyncDeleteTarget.local) {
-          await _deleteLocalFile(Directory(rule.localFolderPath), item.relativePath);
+          await _deleteLocalFile(
+            Directory(rule.localFolderPath),
+            item.relativePath,
+          );
         } else {
           await sftp.remove(path.posix.join(remoteRoot, item.relativePath));
         }
         filesChanged++;
         bytesChanged += item.size;
-        fileReports.add(SyncRunFileReport(relativePath: item.relativePath, action: 'delete', size: item.size));
-        await onProgress?.call(SyncProgressUpdate(currentFilePath: item.relativePath, action: 'delete', filesChanged: filesChanged, bytesChanged: bytesChanged));
+        fileReports.add(
+          SyncRunFileReport(
+            relativePath: item.relativePath,
+            action: 'delete',
+            size: item.size,
+          ),
+        );
+        await onProgress?.call(
+          SyncProgressUpdate(
+            currentFilePath: item.relativePath,
+            action: 'delete',
+            filesChanged: filesChanged,
+            totalFiles: items.length,
+            bytesChanged: bytesChanged,
+          ),
+        );
       }
 
       client.close();
@@ -1315,7 +1532,13 @@ class SyncRuleRepository {
     required SyncRuleModel rule,
   }) async {
     final files = <String, _SyncFileEntry>{};
-    await _collectSftpFilesInDirectory(sftp: sftp, remoteRoot: remoteRoot, relativeDirectory: '.', rule: rule, files: files);
+    await _collectSftpFilesInDirectory(
+      sftp: sftp,
+      remoteRoot: remoteRoot,
+      relativeDirectory: '.',
+      rule: rule,
+      files: files,
+    );
     return files;
   }
 
@@ -1330,21 +1553,35 @@ class SyncRuleRepository {
     final entries = await sftp.listdir(currentPath);
 
     for (final entry in entries) {
-      final relativePath = relativeDirectory == '.' ? entry.filename : path.posix.join(relativeDirectory, entry.filename);
+      final relativePath = relativeDirectory == '.'
+          ? entry.filename
+          : path.posix.join(relativeDirectory, entry.filename);
       if (entry.attr.isDirectory && rule.syncSubfolders) {
         if (entry.filename != '.' && entry.filename != '..') {
-          await _collectSftpFilesInDirectory(sftp: sftp, remoteRoot: remoteRoot, relativeDirectory: relativePath, rule: rule, files: files);
+          await _collectSftpFilesInDirectory(
+            sftp: sftp,
+            remoteRoot: remoteRoot,
+            relativeDirectory: relativePath,
+            rule: rule,
+            files: files,
+          );
         }
         continue;
       }
       if (entry.attr.isFile) {
-        if (_matchesRule(relativePath: relativePath, name: entry.filename, size: entry.attr.size ?? 0, rule: rule)) {
+        if (_matchesRule(
+          relativePath: relativePath,
+          name: entry.filename,
+          size: entry.attr.size ?? 0,
+          rule: rule,
+        )) {
           files[relativePath] = _SyncFileEntry(
             relativePath: relativePath,
             size: entry.attr.size ?? 0,
             modifiedAt: entry.attr.modifyTime != null
                 ? DateTime.fromMillisecondsSinceEpoch(
-                    entry.attr.modifyTime! * 1000)
+                    entry.attr.modifyTime! * 1000,
+                  )
                 : null,
           );
         }

@@ -5,6 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_icons.dart';
 import '../../../core/constants/app_sizes.dart';
+import '../../../core/models/transfer_progress_snapshot.dart';
 import '../../../core/widgets/transfer_status_bar.dart';
 import '../../../core/widgets/ob_card.dart';
 import '../../backup/providers/backup_permission_provider.dart';
@@ -56,10 +57,6 @@ class SyncRuleListScreen extends ConsumerWidget {
                 const _SyncPermissionCard(),
                 const SizedBox(height: AppSizes.paddingM),
                 _SyncRulesOverview(hasFtpServers: ftpServers.isNotEmpty),
-                if (transferProgress?.active == true) ...[
-                  const SizedBox(height: AppSizes.paddingM),
-                  TransferStatusBar(progress: transferProgress!),
-                ],
                 const SizedBox(height: AppSizes.paddingM),
                 _EmptySyncRules(hasFtpServers: ftpServers.isNotEmpty),
               ],
@@ -76,10 +73,6 @@ class SyncRuleListScreen extends ConsumerWidget {
                       const _SyncPermissionCard(),
                       const SizedBox(height: AppSizes.paddingM),
                       _SyncRulesOverview(hasFtpServers: ftpServers.isNotEmpty),
-                      if (transferProgress?.active == true) ...[
-                        const SizedBox(height: AppSizes.paddingM),
-                        TransferStatusBar(progress: transferProgress!),
-                      ],
                     ],
                   );
                 }
@@ -88,6 +81,7 @@ class SyncRuleListScreen extends ConsumerWidget {
                 return _SyncRuleTile(
                   rule: rule,
                   ftpServer: _findServer(ftpServers, rule.ftpServerId),
+                  transferProgress: transferProgress,
                   onEdit: () => _openForm(context, rule),
                 );
               },
@@ -290,11 +284,13 @@ class _SyncRuleTile extends ConsumerWidget {
   const _SyncRuleTile({
     required this.rule,
     required this.ftpServer,
+    required this.transferProgress,
     required this.onEdit,
   });
 
   final SyncRuleModel rule;
   final FtpServerModel? ftpServer;
+  final TransferProgressSnapshot? transferProgress;
   final VoidCallback onEdit;
 
   Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
@@ -329,6 +325,9 @@ class _SyncRuleTile extends ConsumerWidget {
     final isRunning = rule.status == SyncRuleStatus.running;
     final statusColor = _statusColor(rule.status);
     final showDeletePreview = _needsDeletePreview(rule);
+    final activeProgress = isRunning && transferProgress?.active == true
+        ? transferProgress
+        : null;
 
     return OBCard(
       onTap: onEdit,
@@ -411,6 +410,10 @@ class _SyncRuleTile extends ConsumerWidget {
           ),
           const SizedBox(height: AppSizes.paddingM),
           Text(rule.lastMessage, style: Theme.of(context).textTheme.bodyMedium),
+          if (activeProgress != null) ...[
+            const SizedBox(height: AppSizes.paddingM),
+            TransferStatusBar(progress: activeProgress, embedded: true),
+          ],
           const SizedBox(height: AppSizes.paddingM),
           if (showDeletePreview) ...[
             SizedBox(
