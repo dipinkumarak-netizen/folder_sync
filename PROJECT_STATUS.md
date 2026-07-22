@@ -76,6 +76,7 @@ Primary target:
 - Scheduled Backup Jobs
 - Backup Wi-Fi Schedule Rules
 - Backup Instant Folder Watcher
+- SQLite Backup Job Persistence
 
 ## Synchronization Module
 
@@ -203,8 +204,8 @@ Next action:
 
 ## Remaining Feature Inventory
 
-- SQLite persistence migration has started. FTP servers use SQLite; backup
-  jobs, sync rules, history, and settings still use JSON-backed storage.
+- SQLite persistence migration has started. FTP servers and backup jobs use
+  SQLite; sync rules, history, and settings still use JSON-backed storage.
 - Android release application ID is `com.openbackup.app`.
 - Release signing uses local `android/key.properties` or
   `OPENBACKUP_UPLOAD_*` environment variables. Real keystore secrets are not
@@ -220,8 +221,8 @@ Reason:
 
 - The build is currently green, feature documentation is current, and release
   signing no longer falls back to debug keys.
-- Move backup jobs, sync rules, history, and settings onto the shared SQLite
-  database foundation.
+- Move sync rules, history, and settings onto the shared SQLite database
+  foundation.
 
 ---
 
