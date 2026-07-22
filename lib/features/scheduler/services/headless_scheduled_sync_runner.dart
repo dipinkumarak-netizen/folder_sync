@@ -75,7 +75,8 @@ class HeadlessScheduledSyncRunner {
     var failedSyncRules = 0;
 
     for (final job in _backupRepository.getAll()) {
-      if (job.scheduleRule == BackupScheduleRule.manualOnly) {
+      if (job.scheduleRule == BackupScheduleRule.manualOnly ||
+          job.scheduleRule == BackupScheduleRule.instant) {
         continue;
       }
 
@@ -218,15 +219,84 @@ class HeadlessScheduledSyncRunner {
     );
   }
 
-  Future<HeadlessScheduledSyncResult> runInstantSyncRules() async {
+  Future<HeadlessScheduledSyncResult> runInstantBackgroundWork() async {
+    await _backupRepository.load();
     await _ftpRepository.load();
     await _syncRepository.load();
     await _historyRepository.load();
 
     final ftpServers = _ftpRepository.getAll();
+    var checkedJobs = 0;
+    var executedJobs = 0;
+    var failedJobs = 0;
     var checkedSyncRules = 0;
     var executedSyncRules = 0;
     var failedSyncRules = 0;
+
+    for (final job in _backupRepository.getAll()) {
+      if (job.scheduleRule != BackupScheduleRule.instant) {
+        continue;
+      }
+
+      checkedJobs += 1;
+      if (!await _shouldRunInstantBackupJob(job)) {
+        continue;
+      }
+
+      final ftpServer = _findFtpServer(ftpServers, job.ftpServerId);
+      if (ftpServer == null) {
+        await _recordMissingBackupServer(job);
+        failedJobs += 1;
+        continue;
+      }
+
+      executedJobs += 1;
+      final runningJob = job.copyWith(
+        status: BackupJobStatus.running,
+        lastMessage: 'Instant backup is running...',
+      );
+      _backupRepository.update(runningJob);
+
+      final result = await _backupRepository.runBackup(
+        job: runningJob,
+        ftpServer: ftpServer,
+      );
+      if (!result.success) {
+        failedJobs += 1;
+      }
+
+      final completedJob = runningJob.copyWith(
+        status: result.success
+            ? BackupJobStatus.success
+            : BackupJobStatus.failed,
+        lastRunAt: DateTime.now(),
+        lastMessage: result.message,
+        lastFilesBackedUp: result.filesBackedUp,
+        totalFilesBackedUp:
+            runningJob.totalFilesBackedUp + result.filesBackedUp,
+        totalBytesBackedUp:
+            runningJob.totalBytesBackedUp + result.bytesBackedUp,
+        backedUpRelativePaths: result.backedUpRelativePaths,
+      );
+      _backupRepository.update(completedJob);
+      _historyRepository.add(
+        HistoryEntryModel(
+          id: '${completedJob.id}-${DateTime.now().microsecondsSinceEpoch}',
+          operationType: HistoryOperationType.backup,
+          status: result.success
+              ? HistoryEntryStatus.success
+              : HistoryEntryStatus.failed,
+          title: completedJob.name,
+          message: result.message,
+          sourcePath: completedJob.localFolderPath,
+          targetPath: '${ftpServer.name}:${completedJob.remoteFolderPath}',
+          relatedId: completedJob.id,
+          createdAt: DateTime.now(),
+          filesChanged: result.filesBackedUp,
+          bytesChanged: result.bytesBackedUp,
+        ),
+      );
+    }
 
     for (final rule in _syncRepository.getAll()) {
       if (rule.triggerRule != SyncTriggerRule.instant) {
@@ -288,13 +358,14 @@ class HeadlessScheduledSyncRunner {
       );
     }
 
+    await _backupRepository.flush();
     await _syncRepository.flush();
     await _historyRepository.flush();
 
     return HeadlessScheduledSyncResult(
-      checkedJobs: 0,
-      executedJobs: 0,
-      failedJobs: 0,
+      checkedJobs: checkedJobs,
+      executedJobs: executedJobs,
+      failedJobs: failedJobs,
       checkedSyncRules: checkedSyncRules,
       executedSyncRules: executedSyncRules,
       failedSyncRules: failedSyncRules,
@@ -315,6 +386,7 @@ class HeadlessScheduledSyncRunner {
 
     return switch (job.scheduleRule) {
       BackupScheduleRule.manualOnly => false,
+      BackupScheduleRule.instant => false,
       BackupScheduleRule.hourly => _isDue(
         job.lastRunAt,
         const Duration(hours: 1),
@@ -328,6 +400,23 @@ class HeadlessScheduledSyncRunner {
         _homeWifiMinimumInterval,
       ),
     };
+  }
+
+  Future<bool> _shouldRunInstantBackupJob(BackupJobModel job) async {
+    if (!job.enabled ||
+        job.status == BackupJobStatus.running ||
+        job.localFolderPath.trim().isEmpty) {
+      return false;
+    }
+
+    if (job.runOnlyWhileCharging) {
+      final state = await Battery().batteryState;
+      if (state != BatteryState.charging && state != BatteryState.full) {
+        return false;
+      }
+    }
+
+    return _checkBackupNetworkPolicy(job);
   }
 
   Future<bool> _checkBackupNetworkPolicy(BackupJobModel job) async {

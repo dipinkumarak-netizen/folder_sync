@@ -169,10 +169,10 @@ class InstantSyncForegroundService : Service() {
 
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Instant sync",
+            "Instant background work",
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "Watches local folders for instant sync."
+            description = "Watches local folders for instant backup and sync."
         }
 
         getSystemService(NotificationManager::class.java)
@@ -193,8 +193,8 @@ class InstantSyncForegroundService : Service() {
 
         return builder
             .setSmallIcon(applicationInfo.icon)
-            .setContentTitle("OpenBackup Instant Sync")
-            .setContentText("Watching folders for changes")
+            .setContentTitle("OpenBackup Instant Watcher")
+            .setContentText("Watching backup and sync folders")
             .setContentIntent(contentIntent)
             .setOngoing(true)
             .setOnlyAlertOnce(true)

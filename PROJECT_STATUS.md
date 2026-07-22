@@ -79,6 +79,7 @@ File Picker
 - Dart Backup Runner Foreground Service Handoff
 - Scheduled Backup Jobs
 - Backup Wi-Fi Schedule Rules
+- Backup Instant Folder Watcher
 
 ## Synchronization Module
 
@@ -128,6 +129,7 @@ File Picker
 - Android Background Schedule Foundation
 - Headless Dart Scheduled Runner
 - Scheduled Backup Jobs
+- Instant Backup Job Trigger
 - Hourly Sync Rule Trigger
 - Daily Sync Rule Trigger
 - Home Wi-Fi Sync Rule Trigger Foundation
@@ -205,7 +207,6 @@ Next action:
 
 - SQLite persistence is still planned; current repositories are memory/local
   file based.
-- Background folder watching is still pending for backup.
 - Release application ID and signing configuration are still TODOs in Android
   Gradle configuration.
 - README still contains default Flutter starter documentation and should be

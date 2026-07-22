@@ -24,6 +24,9 @@ import '../services/android_instant_sync_service.dart';
 
 final schedulerProvider = Provider<SchedulerService>((ref) {
   final service = SchedulerService(ref);
+  ref.listen(backupJobProvider, (_, _) {
+    unawaited(service.reconfigureAutomaticWork());
+  });
   ref.listen(syncRuleProvider, (_, _) {
     unawaited(service.reconfigureAutomaticWork());
   });
@@ -75,6 +78,7 @@ class SchedulerService {
       final settings = _ref.read(appSettingsProvider);
       if (!settings.automaticSchedulingEnabled) {
         await _cancelInstantSyncWatchers();
+        await AndroidInstantSyncService.cancel();
         return;
       }
 
@@ -180,6 +184,7 @@ class SchedulerService {
 
     return switch (job.scheduleRule) {
       BackupScheduleRule.manualOnly => false,
+      BackupScheduleRule.instant => false,
       BackupScheduleRule.hourly => _isDue(
         job.lastRunAt,
         const Duration(hours: 1),
@@ -229,7 +234,7 @@ class SchedulerService {
     final jobs = _ref.read(backupJobProvider);
     final rules = _ref.read(syncRuleProvider);
     final hasAutomaticWork =
-        jobs.any(_isAutomaticJob) || rules.any(_isBackgroundRule);
+        jobs.any(_isBackgroundJob) || rules.any(_isBackgroundRule);
     if (!hasAutomaticWork) {
       await AndroidBackgroundSchedulerService.cancel();
       return;
@@ -243,6 +248,11 @@ class SchedulerService {
 
   bool _isAutomaticJob(BackupJobModel job) {
     return job.enabled && job.scheduleRule != BackupScheduleRule.manualOnly;
+  }
+
+  bool _isBackgroundJob(BackupJobModel job) {
+    return _isAutomaticJob(job) &&
+        job.scheduleRule != BackupScheduleRule.instant;
   }
 
   bool _isAutomaticRule(SyncRuleModel rule) {
@@ -259,7 +269,7 @@ class SchedulerService {
     List<SyncRuleModel> rules,
   ) {
     final hasHomeWifiJobs = jobs.any(
-      (job) => _isAutomaticJob(job) && job.homeWifiName.trim().isNotEmpty,
+      (job) => _isBackgroundJob(job) && job.homeWifiName.trim().isNotEmpty,
     );
     final hasHomeWifiRules = rules.any(
       (rule) =>
@@ -272,7 +282,8 @@ class SchedulerService {
 
     final hasHourlyJobs = jobs.any(
       (job) =>
-          _isAutomaticJob(job) && job.scheduleRule == BackupScheduleRule.hourly,
+          _isBackgroundJob(job) &&
+          job.scheduleRule == BackupScheduleRule.hourly,
     );
     final hasHourlyRules = rules.any(
       (rule) =>
@@ -333,6 +344,15 @@ class SchedulerService {
       return;
     }
 
+    final instantJobs = _ref
+        .read(backupJobProvider)
+        .where(
+          (job) =>
+              job.enabled &&
+              job.scheduleRule == BackupScheduleRule.instant &&
+              job.localFolderPath.trim().isNotEmpty,
+        )
+        .toList();
     final instantRules = _ref
         .read(syncRuleProvider)
         .where(
@@ -345,12 +365,11 @@ class SchedulerService {
 
     if (Platform.isAndroid) {
       final configured = await AndroidInstantSyncService.configure(
-        enabled: instantRules.isNotEmpty,
-        localFolderPaths: instantRules
-            .map((rule) => rule.localFolderPath.trim())
-            .where((path) => path.isNotEmpty)
-            .toSet()
-            .toList(growable: false),
+        enabled: instantJobs.isNotEmpty || instantRules.isNotEmpty,
+        localFolderPaths: [
+          ...instantJobs.map((job) => job.localFolderPath.trim()),
+          ...instantRules.map((rule) => rule.localFolderPath.trim()),
+        ].where((path) => path.isNotEmpty).toSet().toList(growable: false),
       );
       if (configured) {
         await _cancelInstantSyncWatchers();
@@ -358,25 +377,64 @@ class SchedulerService {
       }
     }
 
-    final activeRuleIds = instantRules.map((rule) => rule.id).toSet();
+    final activeWatcherIds = {
+      ...instantJobs.map((job) => _watcherId('backup', job.id)),
+      ...instantRules.map((rule) => _watcherId('sync', rule.id)),
+    };
 
     for (final watcher in _instantWatchers.values.toList()) {
-      if (!activeRuleIds.contains(watcher.ruleId)) {
-        await _cancelInstantSyncWatcher(watcher.ruleId);
+      if (!activeWatcherIds.contains(watcher.id)) {
+        await _cancelInstantSyncWatcher(watcher.id);
       }
     }
 
+    for (final job in instantJobs) {
+      final watcherId = _watcherId('backup', job.id);
+      final existing = _instantWatchers[watcherId];
+      if (existing != null && existing.localFolderPath == job.localFolderPath) {
+        continue;
+      }
+
+      await _cancelInstantSyncWatcher(watcherId);
+      await _startInstantBackupWatcher(job);
+    }
+
     for (final rule in instantRules) {
-      final existing = _instantWatchers[rule.id];
+      final watcherId = _watcherId('sync', rule.id);
+      final existing = _instantWatchers[watcherId];
       if (existing != null &&
           existing.localFolderPath == rule.localFolderPath &&
           existing.recursive == rule.syncSubfolders) {
         continue;
       }
 
-      await _cancelInstantSyncWatcher(rule.id);
+      await _cancelInstantSyncWatcher(watcherId);
       await _startInstantSyncWatcher(rule);
     }
+  }
+
+  Future<void> _startInstantBackupWatcher(BackupJobModel job) async {
+    final directory = Directory(job.localFolderPath);
+    if (!await directory.exists()) {
+      return;
+    }
+
+    final watcherId = _watcherId('backup', job.id);
+    final subscription = await _watchDirectory(
+      directory: directory,
+      recursive: true,
+      watcherId: watcherId,
+    );
+    if (subscription == null) {
+      return;
+    }
+
+    _instantWatchers[watcherId] = _InstantSyncWatcher(
+      id: watcherId,
+      localFolderPath: job.localFolderPath,
+      recursive: true,
+      subscription: subscription,
+    );
   }
 
   Future<void> _startInstantSyncWatcher(SyncRuleModel rule) async {
@@ -385,49 +443,106 @@ class SchedulerService {
       return;
     }
 
-    StreamSubscription<FileSystemEvent> subscription;
-    var recursive = rule.syncSubfolders;
-    try {
-      subscription = directory
-          .watch(recursive: recursive)
-          .listen(
-            (_) => _scheduleInstantSync(rule.id),
-            onError: (_) {
-              unawaited(_cancelInstantSyncWatcher(rule.id));
-            },
-          );
-    } on FileSystemException {
-      if (!recursive) {
-        return;
-      }
-
-      recursive = false;
-      try {
-        subscription = directory.watch().listen(
-          (_) => _scheduleInstantSync(rule.id),
-          onError: (_) {
-            unawaited(_cancelInstantSyncWatcher(rule.id));
-          },
-        );
-      } on FileSystemException {
-        return;
-      }
+    final watcherId = _watcherId('sync', rule.id);
+    final subscription = await _watchDirectory(
+      directory: directory,
+      recursive: rule.syncSubfolders,
+      watcherId: watcherId,
+    );
+    if (subscription == null) {
+      return;
     }
 
-    _instantWatchers[rule.id] = _InstantSyncWatcher(
-      ruleId: rule.id,
+    _instantWatchers[watcherId] = _InstantSyncWatcher(
+      id: watcherId,
       localFolderPath: rule.localFolderPath,
-      recursive: recursive,
+      recursive: rule.syncSubfolders,
       subscription: subscription,
     );
   }
 
-  void _scheduleInstantSync(String ruleId) {
-    _instantDebounceTimers[ruleId]?.cancel();
-    _instantDebounceTimers[ruleId] = Timer(_instantSyncDebounce, () {
-      _instantDebounceTimers.remove(ruleId);
-      unawaited(_runInstantSyncRule(ruleId));
+  Future<StreamSubscription<FileSystemEvent>?> _watchDirectory({
+    required Directory directory,
+    required bool recursive,
+    required String watcherId,
+  }) async {
+    try {
+      return directory
+          .watch(recursive: recursive)
+          .listen(
+            (_) => _scheduleInstantSync(watcherId),
+            onError: (_) {
+              unawaited(_cancelInstantSyncWatcher(watcherId));
+            },
+          );
+    } on FileSystemException {
+      if (!recursive) {
+        return null;
+      }
+
+      try {
+        return directory.watch().listen(
+          (_) => _scheduleInstantSync(watcherId),
+          onError: (_) {
+            unawaited(_cancelInstantSyncWatcher(watcherId));
+          },
+        );
+      } on FileSystemException {
+        return null;
+      }
+    }
+  }
+
+  void _scheduleInstantSync(String watcherId) {
+    _instantDebounceTimers[watcherId]?.cancel();
+    _instantDebounceTimers[watcherId] = Timer(_instantSyncDebounce, () {
+      _instantDebounceTimers.remove(watcherId);
+      if (watcherId.startsWith('backup:')) {
+        unawaited(_runInstantBackupJob(watcherId.substring('backup:'.length)));
+      } else if (watcherId.startsWith('sync:')) {
+        unawaited(_runInstantSyncRule(watcherId.substring('sync:'.length)));
+      }
     });
+  }
+
+  Future<void> _runInstantBackupJob(String jobId) async {
+    if (_runningJobIds.contains(jobId)) {
+      return;
+    }
+
+    await _loadRepositories();
+    final jobs = _ref.read(backupJobProvider);
+    BackupJobModel? job;
+    for (final item in jobs) {
+      if (item.id == jobId) {
+        job = item;
+        break;
+      }
+    }
+
+    if (job == null ||
+        !job.enabled ||
+        job.scheduleRule != BackupScheduleRule.instant ||
+        job.status == BackupJobStatus.running) {
+      return;
+    }
+
+    final ftpServer = _findFtpServer(
+      _ref.read(ftpServerProvider),
+      job.ftpServerId,
+    );
+    if (ftpServer == null) {
+      return;
+    }
+
+    _runningJobIds.add(job.id);
+    try {
+      await _ref
+          .read(backupJobProvider.notifier)
+          .runJob(job: job, ftpServer: ftpServer);
+    } finally {
+      _runningJobIds.remove(job.id);
+    }
   }
 
   Future<void> _runInstantSyncRule(String ruleId) async {
@@ -489,16 +604,20 @@ class SchedulerService {
     }
     _instantWatchers.clear();
   }
+
+  String _watcherId(String kind, String id) {
+    return '$kind:$id';
+  }
 }
 
 class _InstantSyncWatcher {
-  final String ruleId;
+  final String id;
   final String localFolderPath;
   final bool recursive;
   final StreamSubscription<FileSystemEvent> subscription;
 
   const _InstantSyncWatcher({
-    required this.ruleId,
+    required this.id,
     required this.localFolderPath,
     required this.recursive,
     required this.subscription,

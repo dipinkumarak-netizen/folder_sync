@@ -194,8 +194,8 @@ class _ForegroundReadinessCard extends ConsumerWidget {
             onAction: state.notificationPermanentlyDenied
                 ? openAppSettings
                 : () => ref
-                    .read(backupPermissionProvider.notifier)
-                    .requestNotificationPermission(),
+                      .read(backupPermissionProvider.notifier)
+                      .requestNotificationPermission(),
           );
         }
 
@@ -208,8 +208,8 @@ class _ForegroundReadinessCard extends ConsumerWidget {
           onAction: state.storagePermanentlyDenied
               ? openAppSettings
               : () => ref
-                  .read(backupPermissionProvider.notifier)
-                  .requestStoragePermission(),
+                    .read(backupPermissionProvider.notifier)
+                    .requestStoragePermission(),
         );
       },
     );
@@ -487,6 +487,7 @@ class _BackupJobTile extends ConsumerWidget {
   String _scheduleLabel(BackupScheduleRule scheduleRule) {
     return switch (scheduleRule) {
       BackupScheduleRule.manualOnly => 'Manual',
+      BackupScheduleRule.instant => 'Instant',
       BackupScheduleRule.hourly => 'Hourly',
       BackupScheduleRule.daily => 'Daily',
       BackupScheduleRule.onHomeWifi => 'Home Wi-Fi',

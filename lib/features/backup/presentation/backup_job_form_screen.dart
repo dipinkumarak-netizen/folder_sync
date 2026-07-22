@@ -251,7 +251,9 @@ class _BackupJobFormScreenState extends ConsumerState<BackupJobFormScreen> {
               SwitchListTile(
                 value: _runOnlyWhileCharging,
                 title: const Text('Run Only While Charging'),
-                subtitle: const Text('Backup will wait until device is plugged in.'),
+                subtitle: const Text(
+                  'Backup will wait until device is plugged in.',
+                ),
                 onChanged: (value) {
                   setState(() {
                     _runOnlyWhileCharging = value;
@@ -329,6 +331,7 @@ class _ScheduleDropdown extends StatelessWidget {
   String _scheduleLabel(BackupScheduleRule value) {
     return switch (value) {
       BackupScheduleRule.manualOnly => 'Manual Only',
+      BackupScheduleRule.instant => 'Instant Backup',
       BackupScheduleRule.hourly => 'Hourly',
       BackupScheduleRule.daily => 'Daily',
       BackupScheduleRule.onHomeWifi => 'On Home Wi-Fi',

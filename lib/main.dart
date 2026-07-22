@@ -36,11 +36,12 @@ Future<void> instantSyncMain() async {
   DartPluginRegistrant.ensureInitialized();
 
   try {
-    final result = await HeadlessScheduledSyncRunner().runInstantSyncRules();
+    final result = await HeadlessScheduledSyncRunner()
+        .runInstantBackgroundWork();
     await HeadlessSchedulerBridge.complete(message: result.message);
   } catch (_) {
     await HeadlessSchedulerBridge.complete(
-      message: 'Instant sync failed unexpectedly.',
+      message: 'Instant background work failed unexpectedly.',
     );
   }
 }
