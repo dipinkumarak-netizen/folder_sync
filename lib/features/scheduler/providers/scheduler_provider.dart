@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,6 +23,12 @@ import '../services/android_background_scheduler_service.dart';
 
 final schedulerProvider = Provider<SchedulerService>((ref) {
   final service = SchedulerService(ref);
+  ref.listen(syncRuleProvider, (_, _) {
+    unawaited(service.reconfigureAutomaticWork());
+  });
+  ref.listen(appSettingsProvider, (_, _) {
+    unawaited(service.reconfigureAutomaticWork());
+  });
   ref.onDispose(service.dispose);
   return service;
 });
@@ -31,10 +38,13 @@ class SchedulerService {
 
   static const Duration _tickInterval = Duration(minutes: 1);
   static const Duration _homeWifiMinimumInterval = Duration(minutes: 15);
+  static const Duration _instantSyncDebounce = Duration(seconds: 5);
 
   final Ref _ref;
   final Set<String> _runningJobIds = {};
   final Set<String> _runningRuleIds = {};
+  final Map<String, _InstantSyncWatcher> _instantWatchers = {};
+  final Map<String, Timer> _instantDebounceTimers = {};
   Timer? _timer;
   bool _isTicking = false;
 
@@ -45,6 +55,7 @@ class SchedulerService {
 
     await _loadRepositories();
     await _configureAndroidBackgroundSchedule();
+    await _configureInstantSyncWatchers();
     unawaited(runDueSyncRules());
     _timer = Timer.periodic(_tickInterval, (_) {
       unawaited(runDueSyncRules());
@@ -62,9 +73,11 @@ class SchedulerService {
       await _configureAndroidBackgroundSchedule();
       final settings = _ref.read(appSettingsProvider);
       if (!settings.automaticSchedulingEnabled) {
+        await _cancelInstantSyncWatchers();
         return;
       }
 
+      await _configureInstantSyncWatchers();
       final ftpServers = _ref.read(ftpServerProvider);
       await _runDueBackupJobs(ftpServers);
       await _runDueSyncRules(ftpServers);
@@ -75,12 +88,25 @@ class SchedulerService {
 
   Future<void> refreshBackgroundSchedule() async {
     await _loadRepositories();
+    await reconfigureAutomaticWork();
+  }
+
+  Future<void> reconfigureAutomaticWork() async {
     await _configureAndroidBackgroundSchedule();
+    await _configureInstantSyncWatchers();
   }
 
   void dispose() {
     _timer?.cancel();
     _timer = null;
+    for (final timer in _instantDebounceTimers.values) {
+      timer.cancel();
+    }
+    _instantDebounceTimers.clear();
+    for (final watcher in _instantWatchers.values) {
+      unawaited(watcher.subscription.cancel());
+    }
+    _instantWatchers.clear();
   }
 
   Future<void> _runDueBackupJobs(List<FtpServerModel> ftpServers) async {
@@ -182,6 +208,7 @@ class SchedulerService {
 
     return switch (rule.triggerRule) {
       SyncTriggerRule.manualOnly => false,
+      SyncTriggerRule.instant => false,
       SyncTriggerRule.hourly => _isDue(
         rule.lastRunAt,
         const Duration(hours: 1),
@@ -201,7 +228,7 @@ class SchedulerService {
     final jobs = _ref.read(backupJobProvider);
     final rules = _ref.read(syncRuleProvider);
     final hasAutomaticWork =
-        jobs.any(_isAutomaticJob) || rules.any(_isAutomaticRule);
+        jobs.any(_isAutomaticJob) || rules.any(_isBackgroundRule);
     if (!hasAutomaticWork) {
       await AndroidBackgroundSchedulerService.cancel();
       return;
@@ -221,6 +248,11 @@ class SchedulerService {
     return rule.enabled && rule.triggerRule != SyncTriggerRule.manualOnly;
   }
 
+  bool _isBackgroundRule(SyncRuleModel rule) {
+    return _isAutomaticRule(rule) &&
+        rule.triggerRule != SyncTriggerRule.instant;
+  }
+
   int _backgroundIntervalMinutes(
     List<BackupJobModel> jobs,
     List<SyncRuleModel> rules,
@@ -230,7 +262,7 @@ class SchedulerService {
     );
     final hasHomeWifiRules = rules.any(
       (rule) =>
-          _isAutomaticRule(rule) &&
+          _isBackgroundRule(rule) &&
           rule.triggerRule == SyncTriggerRule.onHomeWifi,
     );
     if (hasHomeWifiJobs || hasHomeWifiRules) {
@@ -243,7 +275,7 @@ class SchedulerService {
     );
     final hasHourlyRules = rules.any(
       (rule) =>
-          _isAutomaticRule(rule) && rule.triggerRule == SyncTriggerRule.hourly,
+          _isBackgroundRule(rule) && rule.triggerRule == SyncTriggerRule.hourly,
     );
     if (hasHourlyJobs) {
       return 60;
@@ -291,4 +323,166 @@ class SchedulerService {
 
     return null;
   }
+
+  Future<void> _configureInstantSyncWatchers() async {
+    final settings = _ref.read(appSettingsProvider);
+    if (!settings.automaticSchedulingEnabled) {
+      await _cancelInstantSyncWatchers();
+      return;
+    }
+
+    final instantRules = _ref
+        .read(syncRuleProvider)
+        .where(
+          (rule) =>
+              rule.enabled &&
+              rule.triggerRule == SyncTriggerRule.instant &&
+              rule.localFolderPath.trim().isNotEmpty,
+        )
+        .toList();
+    final activeRuleIds = instantRules.map((rule) => rule.id).toSet();
+
+    for (final watcher in _instantWatchers.values.toList()) {
+      if (!activeRuleIds.contains(watcher.ruleId)) {
+        await _cancelInstantSyncWatcher(watcher.ruleId);
+      }
+    }
+
+    for (final rule in instantRules) {
+      final existing = _instantWatchers[rule.id];
+      if (existing != null &&
+          existing.localFolderPath == rule.localFolderPath &&
+          existing.recursive == rule.syncSubfolders) {
+        continue;
+      }
+
+      await _cancelInstantSyncWatcher(rule.id);
+      await _startInstantSyncWatcher(rule);
+    }
+  }
+
+  Future<void> _startInstantSyncWatcher(SyncRuleModel rule) async {
+    final directory = Directory(rule.localFolderPath);
+    if (!await directory.exists()) {
+      return;
+    }
+
+    StreamSubscription<FileSystemEvent> subscription;
+    var recursive = rule.syncSubfolders;
+    try {
+      subscription = directory
+          .watch(recursive: recursive)
+          .listen(
+            (_) => _scheduleInstantSync(rule.id),
+            onError: (_) {
+              unawaited(_cancelInstantSyncWatcher(rule.id));
+            },
+          );
+    } on FileSystemException {
+      if (!recursive) {
+        return;
+      }
+
+      recursive = false;
+      try {
+        subscription = directory.watch().listen(
+          (_) => _scheduleInstantSync(rule.id),
+          onError: (_) {
+            unawaited(_cancelInstantSyncWatcher(rule.id));
+          },
+        );
+      } on FileSystemException {
+        return;
+      }
+    }
+
+    _instantWatchers[rule.id] = _InstantSyncWatcher(
+      ruleId: rule.id,
+      localFolderPath: rule.localFolderPath,
+      recursive: recursive,
+      subscription: subscription,
+    );
+  }
+
+  void _scheduleInstantSync(String ruleId) {
+    _instantDebounceTimers[ruleId]?.cancel();
+    _instantDebounceTimers[ruleId] = Timer(_instantSyncDebounce, () {
+      _instantDebounceTimers.remove(ruleId);
+      unawaited(_runInstantSyncRule(ruleId));
+    });
+  }
+
+  Future<void> _runInstantSyncRule(String ruleId) async {
+    if (_runningRuleIds.contains(ruleId)) {
+      return;
+    }
+
+    await _loadRepositories();
+    final rules = _ref.read(syncRuleProvider);
+    SyncRuleModel? rule;
+    for (final item in rules) {
+      if (item.id == ruleId) {
+        rule = item;
+        break;
+      }
+    }
+
+    if (rule == null ||
+        !rule.enabled ||
+        rule.triggerRule != SyncTriggerRule.instant ||
+        rule.status == SyncRuleStatus.running) {
+      return;
+    }
+
+    final ftpServer = _findFtpServer(
+      _ref.read(ftpServerProvider),
+      rule.ftpServerId,
+    );
+    if (ftpServer == null) {
+      return;
+    }
+
+    _runningRuleIds.add(rule.id);
+    try {
+      await _ref
+          .read(syncRuleProvider.notifier)
+          .runRule(rule: rule, ftpServer: ftpServer);
+    } finally {
+      _runningRuleIds.remove(rule.id);
+    }
+  }
+
+  Future<void> _cancelInstantSyncWatcher(String ruleId) async {
+    _instantDebounceTimers.remove(ruleId)?.cancel();
+    final watcher = _instantWatchers.remove(ruleId);
+    if (watcher != null) {
+      await watcher.subscription.cancel();
+    }
+  }
+
+  Future<void> _cancelInstantSyncWatchers() async {
+    for (final timer in _instantDebounceTimers.values) {
+      timer.cancel();
+    }
+    _instantDebounceTimers.clear();
+
+    for (final watcher in _instantWatchers.values.toList()) {
+      await watcher.subscription.cancel();
+    }
+    _instantWatchers.clear();
+  }
+}
+
+class _InstantSyncWatcher {
+  final String ruleId;
+  final String localFolderPath;
+  final bool recursive;
+  final StreamSubscription<FileSystemEvent> subscription;
+
+  const _InstantSyncWatcher({
+    required this.ruleId,
+    required this.localFolderPath,
+    required this.recursive,
+    required this.subscription,
+  });
 }

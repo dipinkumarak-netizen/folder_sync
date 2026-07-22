@@ -144,7 +144,8 @@ class HeadlessScheduledSyncRunner {
     }
 
     for (final rule in rules) {
-      if (rule.triggerRule == SyncTriggerRule.manualOnly) {
+      if (rule.triggerRule == SyncTriggerRule.manualOnly ||
+          rule.triggerRule == SyncTriggerRule.instant) {
         continue;
       }
 
@@ -283,6 +284,7 @@ class HeadlessScheduledSyncRunner {
 
     return switch (rule.triggerRule) {
       SyncTriggerRule.manualOnly => false,
+      SyncTriggerRule.instant => false,
       SyncTriggerRule.hourly => _isDue(
         rule.lastRunAt,
         const Duration(hours: 1),

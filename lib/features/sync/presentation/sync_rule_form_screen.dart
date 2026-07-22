@@ -292,8 +292,11 @@ class _SyncRuleFormScreenState extends ConsumerState<SyncRuleFormScreen> {
               SwitchListTile(
                 value: _runOnlyWhileCharging,
                 title: const Text('Run Only While Charging'),
-                subtitle: const Text('Sync will wait until device is plugged in.'),
-                onChanged: (value) => setState(() => _runOnlyWhileCharging = value),
+                subtitle: const Text(
+                  'Sync will wait until device is plugged in.',
+                ),
+                onChanged: (value) =>
+                    setState(() => _runOnlyWhileCharging = value),
               ),
               TextFormField(
                 controller: _homeWifiController,
@@ -399,6 +402,7 @@ class _SyncRuleFormScreenState extends ConsumerState<SyncRuleFormScreen> {
   String _triggerLabel(SyncTriggerRule value) {
     return switch (value) {
       SyncTriggerRule.manualOnly => 'Manual Only',
+      SyncTriggerRule.instant => 'Instant Sync',
       SyncTriggerRule.onHomeWifi => 'When Home Wi-Fi Connects',
       SyncTriggerRule.hourly => 'Hourly',
       SyncTriggerRule.daily => 'Daily',

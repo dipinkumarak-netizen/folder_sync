@@ -222,7 +222,11 @@ class _SyncPermissionCard extends ConsumerWidget {
               CircleAvatar(
                 radius: 20,
                 backgroundColor: AppColors.warning.withValues(alpha: 0.15),
-                child: const Icon(AppIcons.warning, color: AppColors.warning, size: 20),
+                child: const Icon(
+                  AppIcons.warning,
+                  color: AppColors.warning,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: AppSizes.paddingM),
               Expanded(
@@ -230,14 +234,18 @@ class _SyncPermissionCard extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      isStorageIssue ? 'Storage Access Needed' : 'Notifications Needed',
+                      isStorageIssue
+                          ? 'Storage Access Needed'
+                          : 'Notifications Needed',
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
                     Text(
-                      isStorageIssue 
-                        ? 'Sync requires permission to read/write files.'
-                        : 'Notifications are needed for background sync.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textHint),
+                      isStorageIssue
+                          ? 'Sync requires permission to read/write files.'
+                          : 'Notifications are needed for background sync.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textHint,
+                      ),
                     ),
                   ],
                 ),
@@ -248,19 +256,26 @@ class _SyncPermissionCard extends ConsumerWidget {
                     if (state.storagePermanentlyDenied) {
                       openAppSettings();
                     } else {
-                      ref.read(backupPermissionProvider.notifier).requestStoragePermission();
+                      ref
+                          .read(backupPermissionProvider.notifier)
+                          .requestStoragePermission();
                     }
                   } else {
                     if (state.notificationPermanentlyDenied) {
                       openAppSettings();
                     } else {
-                      ref.read(backupPermissionProvider.notifier).requestNotificationPermission();
+                      ref
+                          .read(backupPermissionProvider.notifier)
+                          .requestNotificationPermission();
                     }
                   }
                 },
                 child: Text(
-                  (isStorageIssue ? state.storagePermanentlyDenied : state.notificationPermanentlyDenied)
-                    ? 'Settings' : 'Allow'
+                  (isStorageIssue
+                          ? state.storagePermanentlyDenied
+                          : state.notificationPermanentlyDenied)
+                      ? 'Settings'
+                      : 'Allow',
                 ),
               ),
             ],
@@ -536,6 +551,7 @@ class _SyncRuleTile extends ConsumerWidget {
   String _triggerLabel(SyncTriggerRule value) {
     return switch (value) {
       SyncTriggerRule.manualOnly => 'Manual',
+      SyncTriggerRule.instant => 'Instant',
       SyncTriggerRule.onHomeWifi => 'Home Wi-Fi',
       SyncTriggerRule.hourly => 'Hourly',
       SyncTriggerRule.daily => 'Daily',

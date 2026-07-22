@@ -22,7 +22,7 @@ enum SyncDeleteRule {
   deleteBothWays,
 }
 
-enum SyncTriggerRule { manualOnly, onHomeWifi, hourly, daily }
+enum SyncTriggerRule { manualOnly, instant, onHomeWifi, hourly, daily }
 
 enum SyncRuleStatus { idle, running, success, failed }
 
