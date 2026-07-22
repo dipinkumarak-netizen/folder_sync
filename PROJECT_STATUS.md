@@ -163,6 +163,64 @@ v0.1.0
 
 ---
 
+# Current Technical Inventory
+
+Last Reviewed: 2026-07-22
+
+## Build and Test Status
+
+- `flutter analyze` passes.
+- `flutter test` passes.
+- `flutter build apk --debug` passes.
+- Android debug build still prints a Kotlin Gradle Plugin migration warning for
+  `battery_plus`, `device_info_plus`, and `file_picker`.
+
+## Kotlin Gradle Plugin Warning
+
+Status: Deferred
+
+The warning was investigated on 2026-07-22.
+
+Stable major upgrades are not currently safe as a single production change:
+
+- `device_info_plus 13.x` conflicts with stable `file_picker 11.x` through
+  incompatible `win32` constraints.
+- `battery_plus 7.x` and `file_picker 11.x` require newer Android built-in
+  Kotlin migration behavior, but the current Flutter Gradle plugin path still
+  requires `android.newDsl=false`.
+- Enabling `android.builtInKotlin=true` with the current setup breaks the debug
+  APK build.
+
+Next action:
+
+- Keep the current dependency set until Flutter/plugin compatibility is aligned.
+- Revisit this as a dedicated dependency migration task, preferably after
+  confirming a compatible stable `file_picker` release or a Flutter Gradle
+  plugin update that supports the new DSL path cleanly.
+
+## Remaining Feature Inventory
+
+- SQLite persistence is still planned; current repositories are memory/local
+  file based.
+- Remote file diffing is still pending for synchronization.
+- Background folder watching is still pending for backup.
+- Release application ID and signing configuration are still TODOs in Android
+  Gradle configuration.
+- README still contains default Flutter starter documentation and should be
+  replaced with OpenBackup-specific setup, feature, and contribution details.
+
+## Recommended Next Task
+
+Priority: README and project documentation refresh.
+
+Reason:
+
+- The build is currently green, but public project documentation is stale.
+- This is low-risk and will make future development, testing, and release work
+  clearer before larger persistence or scheduler changes.
+
+---
+
 # Current File Number
 
 File 21
