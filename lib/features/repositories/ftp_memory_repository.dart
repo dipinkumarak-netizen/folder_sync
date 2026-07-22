@@ -7,7 +7,9 @@ import 'package:dartssh2/dartssh2.dart';
 import 'package:ftpconnect/ftpconnect.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
+import 'package:sqflite/sqflite.dart';
 
+import '../../core/database/openbackup_database.dart';
 import '../../core/utils/failure_message.dart';
 import '../ftp/models/ftp_server_model.dart';
 
@@ -42,26 +44,29 @@ class FtpMemoryRepository {
     _loaded = true;
 
     try {
-      final file = await _storageFile().timeout(const Duration(seconds: 1));
-      if (!await file.exists()) {
+      final database = await OpenBackupDatabase.instance.database;
+      final storedServers = await _loadFromDatabase(database);
+      if (storedServers.isNotEmpty) {
+        _servers
+          ..clear()
+          ..addAll(storedServers);
         return;
       }
 
-      final decoded = jsonDecode(await file.readAsString());
-      if (decoded is! List) {
+      final legacyServers = await _loadFromJson();
+      if (legacyServers.isEmpty) {
         return;
       }
 
       _servers
         ..clear()
-        ..addAll(
-          decoded
-              .whereType<Map<String, dynamic>>()
-              .map(FtpServerModel.fromJson)
-              .where((server) => server.id.isNotEmpty),
-        );
+        ..addAll(legacyServers);
+      await _saveToDatabase(database);
     } catch (_) {
-      return;
+      final legacyServers = await _loadFromJson();
+      _servers
+        ..clear()
+        ..addAll(legacyServers);
     }
   }
 
@@ -141,7 +146,7 @@ class FtpMemoryRepository {
     var connected = false;
     try {
       // The current ftpconnect library might not have supportUTF8 parameter in connect()
-      // or it might be handled internally. If the library doesn't support it, 
+      // or it might be handled internally. If the library doesn't support it,
       // we ignore the flag to prevent build errors.
       connected = await ftpConnect.connect();
       if (!connected) {
@@ -151,7 +156,7 @@ class FtpMemoryRepository {
         );
       }
 
-      // Some modems/routers land the user in a specific folder. 
+      // Some modems/routers land the user in a specific folder.
       // Let's check where we are.
       try {
         await ftpConnect.currentDirectory();
@@ -215,8 +220,8 @@ class FtpMemoryRepository {
       }
 
       final currentPath = _normalizeRemotePath(remotePath);
-      
-      // Attempt to change directory. If it fails, we might already be there 
+
+      // Attempt to change directory. If it fails, we might already be there
       // or the server has a weird root.
       try {
         await _changeRemoteDirectory(ftpConnect, currentPath);
@@ -282,6 +287,62 @@ class FtpMemoryRepository {
 
   Future<void> _save() async {
     try {
+      final database = await OpenBackupDatabase.instance.database;
+      await _saveToDatabase(database);
+      return;
+    } catch (_) {
+      await _saveToJson();
+    }
+  }
+
+  Future<List<FtpServerModel>> _loadFromDatabase(Database database) async {
+    final rows = await database.query(
+      OpenBackupDatabase.ftpServersTable,
+      orderBy: 'name COLLATE NOCASE ASC',
+    );
+    return rows
+        .map(_serverFromRow)
+        .where((server) => server.id.isNotEmpty)
+        .toList();
+  }
+
+  Future<void> _saveToDatabase(Database database) async {
+    await database.transaction((transaction) async {
+      await transaction.delete(OpenBackupDatabase.ftpServersTable);
+      for (final server in _servers) {
+        await transaction.insert(
+          OpenBackupDatabase.ftpServersTable,
+          _serverToRow(server),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+    });
+  }
+
+  Future<List<FtpServerModel>> _loadFromJson() async {
+    try {
+      final file = await _storageFile().timeout(const Duration(seconds: 1));
+      if (!await file.exists()) {
+        return const [];
+      }
+
+      final decoded = jsonDecode(await file.readAsString());
+      if (decoded is! List) {
+        return const [];
+      }
+
+      return decoded
+          .whereType<Map<String, dynamic>>()
+          .map(FtpServerModel.fromJson)
+          .where((server) => server.id.isNotEmpty)
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<void> _saveToJson() async {
+    try {
       final file = await _storageFile();
       final encoded = jsonEncode(
         _servers.map((server) => server.toJson()).toList(),
@@ -290,6 +351,51 @@ class FtpMemoryRepository {
     } catch (_) {
       return;
     }
+  }
+
+  Map<String, Object?> _serverToRow(FtpServerModel server) {
+    return {
+      'id': server.id,
+      'name': server.name,
+      'host': server.host,
+      'port': server.port,
+      'username': server.username,
+      'password': server.password,
+      'remote_path': server.remotePath,
+      'is_anonymous': server.isAnonymous ? 1 : 0,
+      'is_favorite': server.isFavorite ? 1 : 0,
+      'use_passive_mode': server.usePassiveMode ? 1 : 0,
+      'support_utf8': server.supportUtf8 ? 1 : 0,
+      'protocol': server.protocol.name,
+    };
+  }
+
+  FtpServerModel _serverFromRow(Map<String, Object?> row) {
+    return FtpServerModel(
+      id: row['id'] as String? ?? '',
+      name: row['name'] as String? ?? '',
+      host: row['host'] as String? ?? '',
+      port: row['port'] as int? ?? 21,
+      username: row['username'] as String? ?? '',
+      password: row['password'] as String? ?? '',
+      remotePath: row['remote_path'] as String? ?? '/',
+      isAnonymous: _boolFromInt(row['is_anonymous']),
+      isFavorite: _boolFromInt(row['is_favorite']),
+      usePassiveMode: _boolFromInt(row['use_passive_mode'], fallback: true),
+      supportUtf8: _boolFromInt(row['support_utf8'], fallback: true),
+      protocol: ServerProtocol.values.firstWhere(
+        (protocol) => protocol.name == row['protocol'],
+        orElse: () => ServerProtocol.ftp,
+      ),
+    );
+  }
+
+  bool _boolFromInt(Object? value, {bool fallback = false}) {
+    if (value is int) {
+      return value == 1;
+    }
+
+    return fallback;
   }
 
   String _normalizeRemotePath(String remotePath) {
@@ -334,7 +440,7 @@ class FtpMemoryRepository {
       } catch (_) {
         // Fallback to stepping through
       }
-      
+
       // If absolute fails, go to root and then step
       try {
         await ftpConnect.changeDirectory('/');
@@ -365,14 +471,17 @@ class FtpMemoryRepository {
     SSHClient? client;
     try {
       client = SSHClient(
-        await SSHSocket.connect(server.host, server.port,
-            timeout: const Duration(seconds: 10)),
+        await SSHSocket.connect(
+          server.host,
+          server.port,
+          timeout: const Duration(seconds: 10),
+        ),
         username: server.username,
         onPasswordRequest: () => server.password,
       );
 
       final sftp = await client.sftp();
-      
+
       final remotePath = server.remotePath.trim();
       if (remotePath.isNotEmpty && remotePath != '/' && remotePath != '.') {
         await sftp.stat(remotePath);
@@ -403,26 +512,31 @@ class FtpMemoryRepository {
     SSHClient? client;
     try {
       client = SSHClient(
-        await SSHSocket.connect(server.host, server.port,
-            timeout: const Duration(seconds: 15)),
+        await SSHSocket.connect(
+          server.host,
+          server.port,
+          timeout: const Duration(seconds: 15),
+        ),
         username: server.username,
         onPasswordRequest: () => server.password,
       );
 
       final sftp = await client.sftp();
       final currentPath = _normalizeRemotePath(remotePath);
-      
+
       final entries = await sftp.listdir(currentPath);
-      final folders = entries
-          .where((entry) => entry.attr.isDirectory)
-          .map((entry) => FtpRemoteFolderEntry(
-                name: entry.filename,
-                path: _joinRemotePath(currentPath, entry.filename),
-              ))
-          .where((entry) =>
-              entry.name != '.' && entry.name != '..')
-          .toList()
-        ..sort((first, second) => first.name.compareTo(second.name));
+      final folders =
+          entries
+              .where((entry) => entry.attr.isDirectory)
+              .map(
+                (entry) => FtpRemoteFolderEntry(
+                  name: entry.filename,
+                  path: _joinRemotePath(currentPath, entry.filename),
+                ),
+              )
+              .where((entry) => entry.name != '.' && entry.name != '..')
+              .toList()
+            ..sort((first, second) => first.name.compareTo(second.name));
 
       client.close();
       return FtpRemoteFolderListResult(

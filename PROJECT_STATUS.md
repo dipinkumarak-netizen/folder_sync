@@ -56,6 +56,7 @@ Primary target:
 - FTP Connection Failure Details
 - Remote Folder Picker
 - Local FTP Server Persistence
+- SQLite FTP Server Persistence
 
 ## Backup Module
 
@@ -202,8 +203,8 @@ Next action:
 
 ## Remaining Feature Inventory
 
-- SQLite persistence is still planned; current repositories are memory/local
-  file based.
+- SQLite persistence migration has started. FTP servers use SQLite; backup
+  jobs, sync rules, history, and settings still use JSON-backed storage.
 - Android release application ID is `com.openbackup.app`.
 - Release signing uses local `android/key.properties` or
   `OPENBACKUP_UPLOAD_*` environment variables. Real keystore secrets are not
@@ -213,14 +214,14 @@ Next action:
 
 ## Recommended Next Task
 
-Priority: SQLite persistence migration.
+Priority: Continue SQLite persistence migration.
 
 Reason:
 
 - The build is currently green, feature documentation is current, and release
   signing no longer falls back to debug keys.
-- SQLite will make repository storage safer and easier to migrate as the app
-  grows.
+- Move backup jobs, sync rules, history, and settings onto the shared SQLite
+  database foundation.
 
 ---
 
