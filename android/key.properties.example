@@ -1,0 +1,6 @@
+# Copy this file to android/key.properties and fill in real release signing
+# values on the release build machine. Do not commit android/key.properties.
+storeFile=C:/path/to/openbackup-upload-keystore.jks
+storePassword=change-me
+keyAlias=openbackup
+keyPassword=change-me

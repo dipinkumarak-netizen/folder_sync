@@ -143,6 +143,7 @@ Primary target:
 - Native Battery Optimization Request
 - Clear History Action
 - Project README Refresh
+- Android Release Identity and Signing Setup
 
 ## History Module
 
@@ -203,20 +204,23 @@ Next action:
 
 - SQLite persistence is still planned; current repositories are memory/local
   file based.
-- Release application ID and signing configuration are still TODOs in Android
-  Gradle configuration.
+- Android release application ID is `com.openbackup.app`.
+- Release signing uses local `android/key.properties` or
+  `OPENBACKUP_UPLOAD_*` environment variables. Real keystore secrets are not
+  committed.
 - README is now OpenBackup-specific. Keep it updated as release, signing, and
   persistence decisions change.
 
 ## Recommended Next Task
 
-Priority: Release application ID and signing configuration.
+Priority: SQLite persistence migration.
 
 Reason:
 
-- The build is currently green and feature documentation is current.
-- Android release identity still uses the default example package and debug
-  signing.
+- The build is currently green, feature documentation is current, and release
+  signing no longer falls back to debug keys.
+- SQLite will make repository storage safer and easier to migrate as the app
+  grows.
 
 ---
 

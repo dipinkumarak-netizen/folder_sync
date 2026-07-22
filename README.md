@@ -5,8 +5,7 @@ or SFTP servers, restoring files, and synchronizing folders with scheduled or
 instant triggers.
 
 The project is currently an active pre-release app. It is usable for debug
-builds, but release identity, signing, and long-term SQLite persistence are
-still planned work.
+builds, but long-term SQLite persistence is still planned work.
 
 ## Current Features
 
@@ -88,11 +87,42 @@ Some Android vendors may still limit background services aggressively. The app
 uses foreground `dataSync` services where required, but actual behavior can vary
 by device policy.
 
+The Android release `applicationId` is:
+
+```text
+com.openbackup.app
+```
+
+## Release Signing
+
+Release builds do not use debug signing. Configure signing with either
+`android/key.properties` or environment variables.
+
+To use `android/key.properties`, copy `android/key.properties.example` to
+`android/key.properties` and fill in the real keystore values:
+
+```properties
+storeFile=C:/path/to/openbackup-upload-keystore.jks
+storePassword=your-store-password
+keyAlias=openbackup
+keyPassword=your-key-password
+```
+
+`android/key.properties` and keystore files are ignored by Git.
+
+Environment variable alternatives:
+
+```text
+OPENBACKUP_UPLOAD_STORE_FILE
+OPENBACKUP_UPLOAD_STORE_PASSWORD
+OPENBACKUP_UPLOAD_KEY_ALIAS
+OPENBACKUP_UPLOAD_KEY_PASSWORD
+```
+
 ## Known Technical Debt
 
-- Release `applicationId` still uses the default example package.
-- Release signing currently uses debug signing and must be replaced before
-  distribution.
+- Release signing requires local keystore values before building distributable
+  release artifacts.
 - SQLite persistence is planned; current app data is JSON-backed.
 - Kotlin Gradle Plugin migration warning appears for some third-party plugins
   during debug builds. The current dependency set builds successfully, and the
