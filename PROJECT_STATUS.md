@@ -217,8 +217,10 @@ Next action:
 - README is now OpenBackup-specific. Keep it updated as release, signing, and
   persistence decisions change.
 - Real-device background and Huawei FTP compatibility test plan is documented.
-  Physical execution is still pending because no Android device was connected
-  during the 2026-07-22 check.
+- Real-device smoke testing on 2026-07-22 passed install, launch, package
+  identity, service permission declaration, and crash-log checks on a
+  `2201117PI` device. Huawei FTP path and background job execution scenarios
+  still require user-side app configuration and permissions.
 
 ## Recommended Next Task
 

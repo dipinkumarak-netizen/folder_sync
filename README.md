@@ -150,3 +150,6 @@ warnings, and recommended next work.
 
 For physical Android validation, use
 `docs/REAL_DEVICE_BACKGROUND_AND_FTP_TEST_PLAN.md`.
+
+The latest recorded real-device smoke test is documented in
+`docs/REAL_DEVICE_TEST_RESULTS_2026-07-22.md`.
