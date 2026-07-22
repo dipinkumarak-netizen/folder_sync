@@ -42,7 +42,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('System Status'), findsOneWidget);
-    expect(find.text('Configure FTP connections'), findsOneWidget);
+    expect(find.text('Configure FTP and SFTP connections'), findsOneWidget);
     expect(find.text('Create and manage backup jobs'), findsOneWidget);
     expect(find.text('Mirror and two-way sync'), findsOneWidget);
     expect(find.text('Backup history and logs'), findsOneWidget);
@@ -82,11 +82,14 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    await tapDashboardCard(tester, 'Configure FTP connections');
+    await tapDashboardCard(tester, 'Configure FTP and SFTP connections');
 
-    expect(find.text('No FTP Servers'), findsOneWidget);
+    expect(find.text('No Connections'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Add FTP Server'));
+    await tester.tap(find.byTooltip('Add Connection'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('FTP'));
     await tester.pumpAndSettle();
 
     await tester.enterText(find.bySemanticsLabel('Server Name'), 'Test FTP');
@@ -105,10 +108,10 @@ void main() {
     expect(find.text('Test FTP'), findsOneWidget);
     expect(find.text('ftp.test.local:21 - backup_user'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Edit FTP Server'));
+    await tester.tap(find.byTooltip('Edit Connection'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Edit FTP Server'), findsOneWidget);
+    expect(find.text('Edit FTP Connection'), findsOneWidget);
 
     await tester.enterText(find.bySemanticsLabel('Server Name'), 'Office FTP');
     await tester.drag(find.byType(ListView).last, const Offset(0, -240));
@@ -120,15 +123,15 @@ void main() {
     expect(find.text('Office FTP'), findsOneWidget);
     expect(find.text('Test FTP'), findsNothing);
 
-    await tester.tap(find.byTooltip('Delete FTP Server'));
+    await tester.tap(find.byTooltip('Delete Connection'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Delete FTP Server'), findsOneWidget);
+    expect(find.text('Delete Connection'), findsOneWidget);
 
     await tester.tap(find.text('Delete'));
     await tester.pumpAndSettle();
 
-    expect(find.text('No FTP Servers'), findsOneWidget);
+    expect(find.text('No Connections'), findsOneWidget);
     expect(find.text('Office FTP'), findsNothing);
   });
 }

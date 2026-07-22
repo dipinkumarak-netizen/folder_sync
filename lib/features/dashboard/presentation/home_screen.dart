@@ -5,6 +5,7 @@ import '../../../core/constants/app_icons.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../backup/presentation/backup_job_list_screen.dart';
+import '../../ftp/presentation/ftp_server_list_screen.dart';
 import '../../history/presentation/history_screen.dart';
 import '../../restore/presentation/restore_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
@@ -38,6 +39,21 @@ class HomeScreen extends StatelessWidget {
           const SystemStatusCard(),
 
           const SizedBox(height: AppSizes.paddingL),
+
+          DashboardCard(
+            icon: AppIcons.ftp,
+            iconColor: Colors.blue,
+            title: 'Connections',
+            subtitle: 'Configure FTP and SFTP connections',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const FtpServerListScreen()),
+              );
+            },
+          ),
+
+          const SizedBox(height: AppSizes.paddingM),
 
           DashboardCard(
             icon: AppIcons.backup,
