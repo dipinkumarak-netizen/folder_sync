@@ -23,19 +23,14 @@ Primary target:
 
 # Technology Stack
 
-Flutter
-
-Riverpod
-
-SQLite (planned)
-
-FTPConnect
-
-Permission Handler
-
-Logger
-
-File Picker
+- Flutter
+- Riverpod
+- JSON local persistence
+- SQLite (planned)
+- FTPConnect
+- dartssh2
+- Permission Handler
+- File Picker
 
 ---
 
@@ -147,6 +142,7 @@ File Picker
 - Android Readiness Checklist
 - Native Battery Optimization Request
 - Clear History Action
+- Project README Refresh
 
 ## History Module
 
@@ -209,18 +205,18 @@ Next action:
   file based.
 - Release application ID and signing configuration are still TODOs in Android
   Gradle configuration.
-- README still contains default Flutter starter documentation and should be
-  replaced with OpenBackup-specific setup, feature, and contribution details.
+- README is now OpenBackup-specific. Keep it updated as release, signing, and
+  persistence decisions change.
 
 ## Recommended Next Task
 
-Priority: README and project documentation refresh.
+Priority: Release application ID and signing configuration.
 
 Reason:
 
-- The build is currently green, but public project documentation is stale.
-- This is low-risk and will make future development, testing, and release work
-  clearer before larger persistence or scheduler changes.
+- The build is currently green and feature documentation is current.
+- Android release identity still uses the default example package and debug
+  signing.
 
 ---
 
@@ -277,7 +273,7 @@ Working Backup
 - New Files Only Tracking
 - Backup Job Status
 
-Pending:
+Completed:
 
 - Foreground Backup Progress Notifications
 - Scheduled Backup
@@ -293,7 +289,7 @@ Synchronization
 - Delete Handling Rules
 - Wi-Fi Only Rules
 
-Pending:
+Completed:
 
 - Remote File Diffing
 
@@ -353,4 +349,4 @@ GitHub Open Source Release
 
 Last Updated
 
-2026-07-18
+2026-07-22

@@ -1,17 +1,117 @@
-# folder_sync
+# OpenBackup
 
-A new Flutter project.
+OpenBackup is a Flutter-based Android app for backing up local folders to FTP
+or SFTP servers, restoring files, and synchronizing folders with scheduled or
+instant triggers.
 
-## Getting Started
+The project is currently an active pre-release app. It is usable for debug
+builds, but release identity, signing, and long-term SQLite persistence are
+still planned work.
 
-This project is a starting point for a Flutter application.
+## Current Features
 
-A few resources to get you started if this is your first Flutter project:
+- FTP and SFTP connection management with connection testing.
+- Remote folder picker with manual path entry for devices that do not expose
+  folders cleanly through FTP listings.
+- Manual backup of new local files only.
+- Instant backup trigger when files are added to watched folders.
+- Scheduled backup rules: hourly, daily, and home Wi-Fi.
+- Manual, scheduled, and instant sync rules.
+- Sync directions: upload only, download only, two-way, mirror local to remote,
+  and mirror remote to local.
+- Sync conflict rules: newer wins, local wins, remote wins, keep both, and skip.
+- Protected delete preview before destructive sync delete operations.
+- Remote file diffing based on size and modified timestamps.
+- Restore preview and restore run flow with local conflict handling.
+- Backup, sync, and restore history screens.
+- Foreground notifications and progress updates for long-running transfers.
+- Android background scheduling and native folder watching foundation.
+- Dark UI optimized for Android.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## Architecture
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+The app follows the existing feature-folder structure under `lib/features`.
+
+- `models`: immutable data models and enums.
+- `providers`: Riverpod state notifiers and screen-facing state.
+- `presentation`: Flutter screens and widgets.
+- `services`: platform bridges and focused integration helpers.
+- `repositories`: local persistence and FTP/SFTP transfer implementations.
+- `core`: shared theme, constants, widgets, and utility classes.
+
+State management uses `flutter_riverpod`. Current repositories persist JSON
+files under the app documents directory. SQLite is planned, but not yet used.
+
+Android background work uses native Kotlin services and Flutter headless Dart
+entrypoints:
+
+- `scheduledSyncMain` runs due scheduled backup and sync work.
+- `instantSyncMain` runs instant backup jobs and instant sync rules after file
+  watcher events.
+
+## Requirements
+
+- Flutter SDK compatible with `sdk: >=3.8.0 <4.0.0`.
+- Android Studio or Android command-line tools.
+- Java 17 for the Android Gradle build.
+- An Android device or emulator for runtime testing.
+
+## Setup
+
+```bash
+flutter pub get
+flutter analyze
+flutter test
+flutter build apk --debug
+```
+
+The debug APK is generated at:
+
+```text
+build/app/outputs/flutter-apk/app-debug.apk
+```
+
+## Android Notes
+
+The app declares network, storage, notification, foreground service, boot, and
+Wi-Fi related permissions needed by the current feature set.
+
+For best background behavior on physical devices:
+
+- Allow notification permission.
+- Allow storage access for selected folders.
+- Disable battery optimization for OpenBackup when using scheduled or instant
+  jobs.
+- Keep FTP/SFTP credentials and paths correct before enabling background work.
+
+Some Android vendors may still limit background services aggressively. The app
+uses foreground `dataSync` services where required, but actual behavior can vary
+by device policy.
+
+## Known Technical Debt
+
+- Release `applicationId` still uses the default example package.
+- Release signing currently uses debug signing and must be replaced before
+  distribution.
+- SQLite persistence is planned; current app data is JSON-backed.
+- Kotlin Gradle Plugin migration warning appears for some third-party plugins
+  during debug builds. The current dependency set builds successfully, and the
+  migration is deferred until compatible plugin versions are aligned.
+
+## Development Workflow
+
+Each logical change should pass:
+
+```bash
+flutter analyze
+flutter test
+flutter build apk --debug
+```
+
+Keep changes aligned with the existing Riverpod/provider/repository structure.
+Avoid adding new packages or architecture unless a task clearly needs it.
+
+## Project Status
+
+See `PROJECT_STATUS.md` for the current feature inventory, build status, known
+warnings, and recommended next work.

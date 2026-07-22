@@ -18,6 +18,10 @@ service requirements.
   user request the permission or open app settings.
 - The Dart backup runner starts the native foreground service before backup work
   begins and stops it after success or failure.
+- Scheduled backup jobs run through a native Android alarm receiver and a
+  headless Dart entrypoint.
+- Instant backup jobs reuse the native folder watcher service. File events
+  debounce into the headless Dart instant work entrypoint.
 
 ## Permission Strategy
 
@@ -33,18 +37,17 @@ service requirements.
 ## Foreground Service Strategy
 
 - User-triggered manual backup can run after the user starts it from the app.
-- Scheduled/background backup should start the native foreground service before
-  long-running upload work begins.
+- Scheduled backup can run from Android background alarms.
+- Instant backup can run from native folder watcher events when automatic
+  scheduling is enabled.
 - The service must always show an ongoing notification while backup work is
   active.
 - Android 14 and newer require a foreground service type and matching permission;
   this project uses `dataSync` for backup upload work.
 
-## Next Implementation Step
+## Remaining Work
 
-Add foreground progress updates:
-
-1. Send current file/progress updates from Dart to Android.
-2. Update the active foreground notification with progress text.
-3. Add a scheduler only after persistence and foreground service lifecycle are
-   stable.
+- Replace the debug release signing configuration before distribution.
+- Review manufacturer-specific background restrictions on physical devices.
+- Keep the Kotlin Gradle Plugin migration warning tracked until plugin versions
+  support Flutter built-in Kotlin cleanly.
