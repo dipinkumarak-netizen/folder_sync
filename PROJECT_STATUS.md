@@ -25,8 +25,8 @@ Primary target:
 
 - Flutter
 - Riverpod
-- JSON local persistence
-- SQLite (planned)
+- SQLite local persistence
+- Legacy JSON migration support
 - FTPConnect
 - dartssh2
 - Permission Handler
@@ -136,6 +136,7 @@ Primary target:
 
 - Settings Screen
 - Persistent App Settings
+- SQLite App Settings Persistence
 - First-Run Readiness Flow
 - Automatic Scheduling Toggle
 - Backup and Sync Wi-Fi Defaults
@@ -206,8 +207,9 @@ Next action:
 
 ## Remaining Feature Inventory
 
-- SQLite persistence migration has started. FTP servers, backup jobs, sync
-  rules, and history use SQLite; settings still use JSON-backed storage.
+- SQLite is the primary persistence layer for FTP servers, backup jobs, sync
+  rules, history, and app settings. Legacy JSON migration paths are retained
+  for existing installs.
 - Android release application ID is `com.openbackup.app`.
 - Release signing uses local `android/key.properties` or
   `OPENBACKUP_UPLOAD_*` environment variables. Real keystore secrets are not
@@ -217,13 +219,14 @@ Next action:
 
 ## Recommended Next Task
 
-Priority: Continue SQLite persistence migration.
+Priority: Real-device background and FTP compatibility testing.
 
 Reason:
 
 - The build is currently green, feature documentation is current, and release
   signing no longer falls back to debug keys.
-- Move settings onto the shared SQLite database foundation.
+- Validate instant backup/sync, scheduled jobs, Huawei modem FTP paths, and
+  battery optimization behavior on physical Android devices.
 
 ---
 

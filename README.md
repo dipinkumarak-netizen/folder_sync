@@ -5,7 +5,7 @@ or SFTP servers, restoring files, and synchronizing folders with scheduled or
 instant triggers.
 
 The project is currently an active pre-release app. It is usable for debug
-builds, but long-term SQLite persistence is still planned work.
+builds and now uses SQLite for local app persistence.
 
 ## Current Features
 
@@ -38,8 +38,9 @@ The app follows the existing feature-folder structure under `lib/features`.
 - `repositories`: local persistence and FTP/SFTP transfer implementations.
 - `core`: shared theme, constants, widgets, and utility classes.
 
-State management uses `flutter_riverpod`. Current repositories persist JSON
-files under the app documents directory. SQLite is planned, but not yet used.
+State management uses `flutter_riverpod`. Current repositories use SQLite as
+the primary local persistence layer, with legacy JSON migration paths retained
+for existing installs.
 
 Android background work uses native Kotlin services and Flutter headless Dart
 entrypoints:
@@ -123,8 +124,8 @@ OPENBACKUP_UPLOAD_KEY_PASSWORD
 
 - Release signing requires local keystore values before building distributable
   release artifacts.
-- SQLite persistence migration has started. FTP server records, backup jobs,
-  sync rules, and history use SQLite; settings still use JSON-backed storage.
+- SQLite is the primary persistence layer for FTP servers, backup jobs, sync
+  rules, history, and app settings.
 - Kotlin Gradle Plugin migration warning appears for some third-party plugins
   during debug builds. The current dependency set builds successfully, and the
   migration is deferred until compatible plugin versions are aligned.

@@ -17,6 +17,7 @@ class OpenBackupDatabase {
   static const String backupJobsTable = 'backup_jobs';
   static const String syncRulesTable = 'sync_rules';
   static const String historyEntriesTable = 'history_entries';
+  static const String appSettingsTable = 'app_settings';
 
   Database? _database;
 
@@ -29,12 +30,13 @@ class OpenBackupDatabase {
     final databasePath = await getDatabasesPath();
     final db = await openDatabase(
       path.join(databasePath, 'openbackup.db'),
-      version: 4,
+      version: 5,
       onCreate: (database, version) async {
         await _createFtpServersTable(database);
         await _createBackupJobsTable(database);
         await _createSyncRulesTable(database);
         await _createHistoryEntriesTable(database);
+        await _createAppSettingsTable(database);
       },
       onUpgrade: (database, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -45,6 +47,9 @@ class OpenBackupDatabase {
         }
         if (oldVersion < 4) {
           await _createHistoryEntriesTable(database);
+        }
+        if (oldVersion < 5) {
+          await _createAppSettingsTable(database);
         }
       },
     );
@@ -143,6 +148,20 @@ class OpenBackupDatabase {
         files_changed INTEGER NOT NULL,
         bytes_changed INTEGER NOT NULL,
         file_reports TEXT NOT NULL
+      )
+    ''');
+  }
+
+  Future<void> _createAppSettingsTable(Database database) async {
+    await database.execute('''
+      CREATE TABLE $appSettingsTable (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        automatic_scheduling_enabled INTEGER NOT NULL,
+        default_backup_wifi_only INTEGER NOT NULL,
+        default_sync_wifi_only INTEGER NOT NULL,
+        show_foreground_notifications INTEGER NOT NULL,
+        onboarding_completed INTEGER NOT NULL,
+        biometric_lock_enabled INTEGER NOT NULL
       )
     ''');
   }
