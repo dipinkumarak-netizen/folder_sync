@@ -147,3 +147,6 @@ Avoid adding new packages or architecture unless a task clearly needs it.
 
 See `PROJECT_STATUS.md` for the current feature inventory, build status, known
 warnings, and recommended next work.
+
+For physical Android validation, use
+`docs/REAL_DEVICE_BACKGROUND_AND_FTP_TEST_PLAN.md`.

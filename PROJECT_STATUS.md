@@ -216,17 +216,20 @@ Next action:
   committed.
 - README is now OpenBackup-specific. Keep it updated as release, signing, and
   persistence decisions change.
+- Real-device background and Huawei FTP compatibility test plan is documented.
+  Physical execution is still pending because no Android device was connected
+  during the 2026-07-22 check.
 
 ## Recommended Next Task
 
-Priority: Real-device background and FTP compatibility testing.
+Priority: Execute real-device background and Huawei FTP compatibility testing.
 
 Reason:
 
 - The build is currently green, feature documentation is current, and release
   signing no longer falls back to debug keys.
-- Validate instant backup/sync, scheduled jobs, Huawei modem FTP paths, and
-  battery optimization behavior on physical Android devices.
+- Connect a physical Android device and run the documented background, instant
+  watcher, SQLite migration, and Huawei modem FTP path scenarios.
 
 ---
 
