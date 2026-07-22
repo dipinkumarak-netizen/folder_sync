@@ -94,6 +94,7 @@ File Picker
 - Manual Sync Runner
 - In-App Instant Sync Trigger
 - Android Native Instant Sync Foreground Watcher
+- Remote File Diffing
 - Sync History Logging
 - Wi-Fi Only Sync Enforcement
 - Home Wi-Fi Name Check Foundation
@@ -204,7 +205,6 @@ Next action:
 
 - SQLite persistence is still planned; current repositories are memory/local
   file based.
-- Remote file diffing is still pending for synchronization.
 - Background folder watching is still pending for backup.
 - Release application ID and signing configuration are still TODOs in Android
   Gradle configuration.

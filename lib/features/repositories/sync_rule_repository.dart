@@ -5,6 +5,7 @@ import 'dart:io';
 
 import 'package:dartssh2/dartssh2.dart';
 import 'package:ftpconnect/ftpconnect.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
@@ -118,6 +119,7 @@ class SyncRuleRepository {
   SyncRuleRepository._();
 
   static final SyncRuleRepository instance = SyncRuleRepository._();
+  static const Duration _modifiedTimeTolerance = Duration(seconds: 2);
 
   final List<SyncRuleModel> _rules = [];
   bool _loaded = false;
@@ -682,6 +684,7 @@ class SyncRuleRepository {
       if (!downloaded) {
         throw StateError('Could not download ${remoteEntry.relativePath}.');
       }
+      await _applyRemoteModifiedTime(localFile, remoteEntry.modifiedAt);
 
       filesChanged += 1;
       bytesChanged += remoteEntry.size;
@@ -836,6 +839,10 @@ class SyncRuleRepository {
       return true;
     }
 
+    if (!_filesDiffer(localEntry, remoteEntry)) {
+      return false;
+    }
+
     return switch (conflictRule) {
       SyncConflictRule.localWins => true,
       SyncConflictRule.remoteWins => false,
@@ -854,6 +861,10 @@ class SyncRuleRepository {
       return true;
     }
 
+    if (!_filesDiffer(remoteEntry, localEntry)) {
+      return false;
+    }
+
     return switch (conflictRule) {
       SyncConflictRule.localWins => false,
       SyncConflictRule.remoteWins => true,
@@ -870,7 +881,86 @@ class SyncRuleRepository {
       return source.size != target.size;
     }
 
-    return sourceTime.isAfter(targetTime) && source.size != target.size;
+    return sourceTime.difference(targetTime) > _modifiedTimeTolerance;
+  }
+
+  bool _filesDiffer(_SyncFileEntry source, _SyncFileEntry target) {
+    if (source.size != target.size) {
+      return true;
+    }
+
+    final sourceTime = source.modifiedAt;
+    final targetTime = target.modifiedAt;
+    if (sourceTime == null || targetTime == null) {
+      return false;
+    }
+
+    return sourceTime.difference(targetTime).abs() > _modifiedTimeTolerance;
+  }
+
+  Future<void> _applyRemoteModifiedTime(
+    File localFile,
+    DateTime? remoteModifiedAt,
+  ) async {
+    if (remoteModifiedAt == null) {
+      return;
+    }
+
+    try {
+      await localFile.setLastModified(remoteModifiedAt);
+    } catch (_) {
+      return;
+    }
+  }
+
+  @visibleForTesting
+  bool shouldUploadForTest({
+    required int localSize,
+    required DateTime? localModifiedAt,
+    required int? remoteSize,
+    required DateTime? remoteModifiedAt,
+    required SyncConflictRule conflictRule,
+  }) {
+    return _shouldTransferLocalToRemote(
+      _SyncFileEntry(
+        relativePath: 'file.txt',
+        size: localSize,
+        modifiedAt: localModifiedAt,
+      ),
+      remoteSize == null
+          ? null
+          : _SyncFileEntry(
+              relativePath: 'file.txt',
+              size: remoteSize,
+              modifiedAt: remoteModifiedAt,
+            ),
+      conflictRule,
+    );
+  }
+
+  @visibleForTesting
+  bool shouldDownloadForTest({
+    required int? localSize,
+    required DateTime? localModifiedAt,
+    required int remoteSize,
+    required DateTime? remoteModifiedAt,
+    required SyncConflictRule conflictRule,
+  }) {
+    return _shouldTransferRemoteToLocal(
+      localSize == null
+          ? null
+          : _SyncFileEntry(
+              relativePath: 'file.txt',
+              size: localSize,
+              modifiedAt: localModifiedAt,
+            ),
+      _SyncFileEntry(
+        relativePath: 'file.txt',
+        size: remoteSize,
+        modifiedAt: remoteModifiedAt,
+      ),
+      conflictRule,
+    );
   }
 
   int _countPendingSyncFiles({
@@ -1345,6 +1435,7 @@ class SyncRuleRepository {
             final sink = localFile.openWrite();
             await sink.addStream(remoteFile.read());
             await sink.close();
+            await _applyRemoteModifiedTime(localFile, remoteEntry.modifiedAt);
 
             filesChanged++;
             bytesChanged += remoteEntry.size;
