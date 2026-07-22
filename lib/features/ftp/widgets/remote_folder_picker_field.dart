@@ -124,6 +124,7 @@ class _RemoteFolderPickerDialog extends ConsumerStatefulWidget {
 
 class _RemoteFolderPickerDialogState
     extends ConsumerState<_RemoteFolderPickerDialog> {
+  late final TextEditingController _pathController;
   var _currentPath = '/';
   var _isLoading = true;
   FtpRemoteFolderListResult? _result;
@@ -132,12 +133,21 @@ class _RemoteFolderPickerDialogState
   void initState() {
     super.initState();
     _currentPath = _normalizeRemotePath(widget.initialPath);
+    _pathController = TextEditingController(text: _currentPath);
     _loadFolders(_currentPath);
   }
 
+  @override
+  void dispose() {
+    _pathController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadFolders(String remotePath) async {
+    final normalizedPath = _normalizeRemotePath(remotePath);
     setState(() {
-      _currentPath = _normalizeRemotePath(remotePath);
+      _currentPath = normalizedPath;
+      _pathController.text = normalizedPath;
       _isLoading = true;
     });
 
@@ -152,6 +162,7 @@ class _RemoteFolderPickerDialogState
     setState(() {
       _result = result;
       _currentPath = result.currentPath;
+      _pathController.text = result.currentPath;
       _isLoading = false;
     });
   }
@@ -168,11 +179,26 @@ class _RemoteFolderPickerDialogState
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              _currentPath,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: AppColors.textHint),
+            TextField(
+              controller: _pathController,
+              enabled: !_isLoading,
+              decoration: const InputDecoration(
+                labelText: 'Remote Path',
+                prefixIcon: Icon(Icons.folder_rounded),
+              ),
+              textInputAction: TextInputAction.go,
+              onSubmitted: _loadFolders,
+            ),
+            const SizedBox(height: AppSizes.paddingS),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: _isLoading
+                    ? null
+                    : () => _loadFolders(_pathController.text),
+                icon: const Icon(Icons.arrow_forward_rounded),
+                label: const Text('Open Path'),
+              ),
             ),
             const SizedBox(height: AppSizes.paddingM),
             Flexible(
@@ -202,7 +228,10 @@ class _RemoteFolderPickerDialogState
         FilledButton(
           onPressed: _isLoading
               ? null
-              : () => Navigator.pop(context, _currentPath),
+              : () => Navigator.pop(
+                  context,
+                  _normalizeRemotePath(_pathController.text),
+                ),
           child: const Text('Select Folder'),
         ),
       ],
