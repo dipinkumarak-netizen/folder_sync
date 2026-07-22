@@ -13,6 +13,7 @@ import '../../sync/models/sync_rule_model.dart';
 import '../../sync/providers/sync_rule_provider.dart';
 import '../../sync/services/wifi_status_service.dart';
 import '../services/android_background_scheduler_service.dart';
+import '../services/android_instant_sync_service.dart';
 
 /// ===============================================================
 /// OpenBackup
@@ -328,6 +329,7 @@ class SchedulerService {
     final settings = _ref.read(appSettingsProvider);
     if (!settings.automaticSchedulingEnabled) {
       await _cancelInstantSyncWatchers();
+      await AndroidInstantSyncService.cancel();
       return;
     }
 
@@ -340,6 +342,22 @@ class SchedulerService {
               rule.localFolderPath.trim().isNotEmpty,
         )
         .toList();
+
+    if (Platform.isAndroid) {
+      final configured = await AndroidInstantSyncService.configure(
+        enabled: instantRules.isNotEmpty,
+        localFolderPaths: instantRules
+            .map((rule) => rule.localFolderPath.trim())
+            .where((path) => path.isNotEmpty)
+            .toSet()
+            .toList(growable: false),
+      );
+      if (configured) {
+        await _cancelInstantSyncWatchers();
+        return;
+      }
+    }
+
     final activeRuleIds = instantRules.map((rule) => rule.id).toSet();
 
     for (final watcher in _instantWatchers.values.toList()) {

@@ -30,6 +30,21 @@ Future<void> scheduledSyncMain() async {
   }
 }
 
+@pragma('vm:entry-point')
+Future<void> instantSyncMain() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  DartPluginRegistrant.ensureInitialized();
+
+  try {
+    final result = await HeadlessScheduledSyncRunner().runInstantSyncRules();
+    await HeadlessSchedulerBridge.complete(message: result.message);
+  } catch (_) {
+    await HeadlessSchedulerBridge.complete(
+      message: 'Instant sync failed unexpectedly.',
+    );
+  }
+}
+
 class FtpBackupApp extends StatelessWidget {
   const FtpBackupApp({super.key});
 

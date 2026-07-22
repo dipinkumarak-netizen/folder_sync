@@ -39,14 +39,14 @@ class HeadlessScheduledSyncResult {
     final executedTotal = executedJobs + executedSyncRules;
     final failedTotal = failedJobs + failedSyncRules;
     if (executedTotal == 0) {
-      return 'No scheduled work was due.';
+      return 'No background work was due.';
     }
 
     if (failedTotal == 0) {
-      return 'Ran $executedTotal scheduled task(s).';
+      return 'Ran $executedTotal background task(s).';
     }
 
-    return 'Ran $executedTotal scheduled task(s), $failedTotal failed.';
+    return 'Ran $executedTotal background task(s), $failedTotal failed.';
   }
 }
 
@@ -218,6 +218,89 @@ class HeadlessScheduledSyncRunner {
     );
   }
 
+  Future<HeadlessScheduledSyncResult> runInstantSyncRules() async {
+    await _ftpRepository.load();
+    await _syncRepository.load();
+    await _historyRepository.load();
+
+    final ftpServers = _ftpRepository.getAll();
+    var checkedSyncRules = 0;
+    var executedSyncRules = 0;
+    var failedSyncRules = 0;
+
+    for (final rule in _syncRepository.getAll()) {
+      if (rule.triggerRule != SyncTriggerRule.instant) {
+        continue;
+      }
+
+      checkedSyncRules += 1;
+      if (!await _shouldRunInstantRule(rule)) {
+        continue;
+      }
+
+      final ftpServer = _findFtpServer(ftpServers, rule.ftpServerId);
+      if (ftpServer == null) {
+        await _recordMissingServer(rule);
+        failedSyncRules += 1;
+        continue;
+      }
+
+      executedSyncRules += 1;
+      final runningRule = rule.copyWith(
+        status: SyncRuleStatus.running,
+        lastMessage: 'Instant synchronization is running...',
+      );
+      _syncRepository.update(runningRule);
+
+      final result = await _syncRepository.runSync(
+        rule: runningRule,
+        ftpServer: ftpServer,
+      );
+      if (!result.success) {
+        failedSyncRules += 1;
+      }
+
+      final completedRule = runningRule.copyWith(
+        status: result.success ? SyncRuleStatus.success : SyncRuleStatus.failed,
+        lastRunAt: DateTime.now(),
+        lastMessage: result.message,
+        lastFilesChanged: result.filesChanged,
+        totalFilesChanged: runningRule.totalFilesChanged + result.filesChanged,
+        totalBytesChanged: runningRule.totalBytesChanged + result.bytesChanged,
+      );
+      _syncRepository.update(completedRule);
+      _historyRepository.add(
+        HistoryEntryModel(
+          id: '${completedRule.id}-${DateTime.now().microsecondsSinceEpoch}',
+          operationType: HistoryOperationType.sync,
+          status: result.success
+              ? HistoryEntryStatus.success
+              : HistoryEntryStatus.failed,
+          title: completedRule.name,
+          message: result.message,
+          sourcePath: completedRule.localFolderPath,
+          targetPath: '${ftpServer.name}:${completedRule.remoteFolderPath}',
+          relatedId: completedRule.id,
+          createdAt: DateTime.now(),
+          filesChanged: result.filesChanged,
+          bytesChanged: result.bytesChanged,
+        ),
+      );
+    }
+
+    await _syncRepository.flush();
+    await _historyRepository.flush();
+
+    return HeadlessScheduledSyncResult(
+      checkedJobs: 0,
+      executedJobs: 0,
+      failedJobs: 0,
+      checkedSyncRules: checkedSyncRules,
+      executedSyncRules: executedSyncRules,
+      failedSyncRules: failedSyncRules,
+    );
+  }
+
   Future<bool> _shouldRunBackupJob(BackupJobModel job) async {
     if (!job.enabled || job.status == BackupJobStatus.running) {
       return false;
@@ -292,6 +375,33 @@ class HeadlessScheduledSyncRunner {
       SyncTriggerRule.daily => _isDue(rule.lastRunAt, const Duration(days: 1)),
       SyncTriggerRule.onHomeWifi => _isHomeWifiRuleDue(rule),
     };
+  }
+
+  Future<bool> _shouldRunInstantRule(SyncRuleModel rule) async {
+    if (!rule.enabled ||
+        rule.status == SyncRuleStatus.running ||
+        rule.localFolderPath.trim().isEmpty) {
+      return false;
+    }
+
+    if (rule.runOnlyWhileCharging) {
+      final state = await Battery().batteryState;
+      if (state != BatteryState.charging && state != BatteryState.full) {
+        return false;
+      }
+    }
+
+    if (!await _checkNetworkPolicy(rule)) {
+      return false;
+    }
+
+    final expectedSsid = rule.homeWifiName.trim();
+    if (expectedSsid.isEmpty) {
+      return true;
+    }
+
+    final currentSsid = await WifiStatusService.currentSsid();
+    return currentSsid == expectedSsid;
   }
 
   Future<bool> _checkNetworkPolicy(SyncRuleModel rule) async {

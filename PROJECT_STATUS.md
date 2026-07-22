@@ -93,6 +93,7 @@ File Picker
 - Local Sync Rule Persistence
 - Manual Sync Runner
 - In-App Instant Sync Trigger
+- Android Native Instant Sync Foreground Watcher
 - Sync History Logging
 - Wi-Fi Only Sync Enforcement
 - Home Wi-Fi Name Check Foundation
@@ -205,8 +206,6 @@ Next action:
   file based.
 - Remote file diffing is still pending for synchronization.
 - Background folder watching is still pending for backup.
-- Native Android background FileObserver service is still pending for full
-  instant sync while the app is closed.
 - Release application ID and signing configuration are still TODOs in Android
   Gradle configuration.
 - README still contains default Flutter starter documentation and should be

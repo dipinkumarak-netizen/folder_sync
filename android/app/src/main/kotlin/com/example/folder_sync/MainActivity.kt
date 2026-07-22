@@ -72,6 +72,27 @@ class MainActivity : FlutterFragmentActivity() {
 
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
+            INSTANT_SYNC_CHANNEL
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "configure" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    val rawPaths = call.argument<List<Any>>("paths") ?: emptyList()
+                    val paths = rawPaths.mapNotNull { it as? String }
+                    result.success(AndroidInstantSync.configure(this, enabled, paths))
+                }
+
+                "cancel" -> {
+                    AndroidInstantSync.cancel(this)
+                    result.success(null)
+                }
+
+                else -> result.notImplemented()
+            }
+        }
+
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
             BATTERY_OPTIMIZATION_CHANNEL
         ).setMethodCallHandler { call, result ->
             when (call.method) {
@@ -173,6 +194,7 @@ class MainActivity : FlutterFragmentActivity() {
         private const val WIFI_STATUS_CHANNEL = "openbackup/wifi_status"
         private const val BACKGROUND_SCHEDULER_CHANNEL =
             "openbackup/background_scheduler"
+        private const val INSTANT_SYNC_CHANNEL = "openbackup/instant_sync"
         private const val BATTERY_OPTIMIZATION_CHANNEL =
             "openbackup/battery_optimization"
     }

@@ -57,6 +57,11 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <service
+            android:name=".InstantSyncForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
         <receiver
             android:name=".BackgroundScheduleReceiver"
             android:exported="false" />

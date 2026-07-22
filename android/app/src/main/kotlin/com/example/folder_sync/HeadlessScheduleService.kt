@@ -44,7 +44,9 @@ class HeadlessScheduleService : Service() {
             startForeground(NOTIFICATION_ID, notification)
         }
 
-        startHeadlessDart()
+        val dartEntrypoint = intent?.getStringExtra(EXTRA_DART_ENTRYPOINT)
+            ?: SCHEDULED_SYNC_ENTRYPOINT
+        startHeadlessDart(dartEntrypoint)
         timeoutHandler.postDelayed(timeoutRunnable, TIMEOUT_MILLIS)
         return START_NOT_STICKY
     }
@@ -56,7 +58,7 @@ class HeadlessScheduleService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    private fun startHeadlessDart() {
+    private fun startHeadlessDart(dartEntrypointName: String) {
         val loader = FlutterInjector.instance().flutterLoader()
         loader.startInitialization(this)
         loader.ensureInitializationComplete(this, null)
@@ -68,7 +70,7 @@ class HeadlessScheduleService : Service() {
         flutterEngine = engine
         val entrypoint = DartExecutor.DartEntrypoint(
             loader.findAppBundlePath(),
-            "scheduledSyncMain"
+            dartEntrypointName
         )
         engine.dartExecutor.executeDartEntrypoint(entrypoint)
     }
@@ -173,6 +175,8 @@ class HeadlessScheduleService : Service() {
     }
 
     companion object {
+        const val EXTRA_DART_ENTRYPOINT = "dart_entrypoint"
+        private const val SCHEDULED_SYNC_ENTRYPOINT = "scheduledSyncMain"
         private const val HEADLESS_SCHEDULER_CHANNEL = "openbackup/headless_scheduler"
         private const val WIFI_STATUS_CHANNEL = "openbackup/wifi_status"
         private const val CHANNEL_ID = "scheduled_sync"
