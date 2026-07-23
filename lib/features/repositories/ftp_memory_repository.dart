@@ -186,7 +186,9 @@ class FtpMemoryRepository {
       );
     } finally {
       if (connected) {
-        await ftpConnect.disconnect();
+        try {
+          await ftpConnect.disconnect();
+        } catch (_) {}
       }
     }
   }
@@ -199,13 +201,7 @@ class FtpMemoryRepository {
       return _listSftpFolders(server: server, remotePath: remotePath);
     }
 
-    final ftpConnect = FTPConnect(
-      server.host,
-      port: server.port,
-      user: server.isAnonymous ? 'anonymous' : server.username,
-      pass: server.isAnonymous ? '' : server.password,
-      timeout: 15,
-    );
+    var ftpConnect = _createFtpClient(server, timeout: 15);
 
     var connected = false;
     try {
@@ -230,7 +226,30 @@ class FtpMemoryRepository {
         if (currentPath != '/') rethrow;
       }
 
-      final entries = await ftpConnect.listDirectoryContent();
+      List<FTPEntry> entries;
+      try {
+        entries = await ftpConnect.listDirectoryContent();
+      } catch (_) {
+        // Older router/modem FTP servers (including Huawei bftpd) commonly
+        // reject MLSD with a 500 response. Reconnect before retrying because
+        // a failed data-channel command can leave the FTP session unusable.
+        await ftpConnect.disconnect();
+        connected = false;
+
+        ftpConnect = _createFtpClient(server, timeout: 15)
+          ..listCommand = ListCommand.list;
+        connected = await ftpConnect.connect();
+        if (!connected) {
+          throw StateError('Could not reconnect to the FTP server.');
+        }
+
+        try {
+          await _changeRemoteDirectory(ftpConnect, currentPath);
+        } catch (_) {
+          if (currentPath != '/') rethrow;
+        }
+        entries = await ftpConnect.listDirectoryContent();
+      }
       final folders =
           entries
               .where((entry) => entry.type == FTPEntryType.dir)
@@ -273,6 +292,16 @@ class FtpMemoryRepository {
         await ftpConnect.disconnect();
       }
     }
+  }
+
+  FTPConnect _createFtpClient(FtpServerModel server, {required int timeout}) {
+    return FTPConnect(
+      server.host,
+      port: server.port,
+      user: server.isAnonymous ? 'anonymous' : server.username,
+      pass: server.isAnonymous ? '' : server.password,
+      timeout: timeout,
+    );
   }
 
   Future<File> _storageFile() async {

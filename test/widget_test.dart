@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:folder_sync/main.dart';
+import 'package:folder_sync/features/ftp/widgets/remote_folder_picker_field.dart';
 
 void main() {
   Future<void> tapDashboardCard(WidgetTester tester, String subtitle) async {
@@ -98,6 +99,14 @@ void main() {
       'ftp.test.local',
     );
     await tester.enterText(find.bySemanticsLabel('Username'), 'backup_user');
+    await tester.pump();
+
+    final remoteFolderField = tester.widget<RemoteFolderPickerField>(
+      find.byType(RemoteFolderPickerField),
+    );
+    expect(remoteFolderField.ftpServer, isNotNull);
+    expect(remoteFolderField.ftpServer!.host, 'ftp.test.local');
+    expect(remoteFolderField.ftpServer!.username, 'backup_user');
 
     await tester.drag(find.byType(ListView).last, const Offset(0, -240));
     await tester.pumpAndSettle();

@@ -237,7 +237,7 @@ class SyncRuleRepository {
       user: ftpServer.isAnonymous ? 'anonymous' : ftpServer.username,
       pass: ftpServer.isAnonymous ? '' : ftpServer.password,
       timeout: 30,
-    );
+    )..listCommand = ListCommand.list;
 
     var connected = false;
     try {
@@ -367,7 +367,7 @@ class SyncRuleRepository {
       user: ftpServer.isAnonymous ? 'anonymous' : ftpServer.username,
       pass: ftpServer.isAnonymous ? '' : ftpServer.password,
       timeout: 30,
-    );
+    )..listCommand = ListCommand.list;
 
     var connected = false;
     try {
@@ -461,7 +461,7 @@ class SyncRuleRepository {
       user: ftpServer.isAnonymous ? 'anonymous' : ftpServer.username,
       pass: ftpServer.isAnonymous ? '' : ftpServer.password,
       timeout: 30,
-    );
+    )..listCommand = ListCommand.list;
 
     var connected = false;
     try {

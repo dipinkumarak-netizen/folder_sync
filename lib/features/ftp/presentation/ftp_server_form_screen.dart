@@ -94,6 +94,10 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
     );
   }
 
+  void _refreshBrowserConfiguration(String _) {
+    setState(() {});
+  }
+
   FtpServerModel _buildServerFromForm() {
     final remotePath = _remotePathController.text.trim();
     return FtpServerModel(
@@ -166,9 +170,11 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text(_isEditing 
-            ? "Edit ${_protocol.name.toUpperCase()} Connection" 
-            : "Add ${_protocol.name.toUpperCase()} Connection"),
+        title: Text(
+          _isEditing
+              ? "Edit ${_protocol.name.toUpperCase()} Connection"
+              : "Add ${_protocol.name.toUpperCase()} Connection",
+        ),
       ),
       body: SafeArea(
         child: Form(
@@ -188,6 +194,7 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
               const SizedBox(height: AppSizes.paddingM),
               TextFormField(
                 controller: _hostController,
+                onChanged: _refreshBrowserConfiguration,
                 decoration: _inputDecoration("Host / IP Address", Icons.dns),
                 validator: (value) =>
                     value == null || value.trim().isEmpty ? "Required" : null,
@@ -195,6 +202,7 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
               const SizedBox(height: AppSizes.paddingM),
               TextFormField(
                 controller: _portController,
+                onChanged: _refreshBrowserConfiguration,
                 keyboardType: TextInputType.number,
                 decoration: _inputDecoration("Port", Icons.settings_ethernet),
                 validator: (value) {
@@ -213,6 +221,7 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
               const SizedBox(height: AppSizes.paddingM),
               TextFormField(
                 controller: _userController,
+                onChanged: _refreshBrowserConfiguration,
                 enabled: !_anonymousLogin,
                 decoration: _inputDecoration("Username", Icons.person),
                 validator: (value) {
@@ -228,6 +237,7 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
               const SizedBox(height: AppSizes.paddingM),
               TextFormField(
                 controller: _passwordController,
+                onChanged: _refreshBrowserConfiguration,
                 enabled: !_anonymousLogin,
                 obscureText: !_showPassword,
                 decoration: _inputDecoration("Password", Icons.lock).copyWith(
@@ -265,7 +275,9 @@ class _FtpServerFormScreenState extends ConsumerState<FtpServerFormScreen> {
               SwitchListTile(
                 value: _supportUtf8,
                 title: const Text("Support UTF-8"),
-                subtitle: const Text("Turn off for older routers or modems (if supported by app)"),
+                subtitle: const Text(
+                  "Turn off for older routers or modems (if supported by app)",
+                ),
                 onChanged: (value) {
                   setState(() {
                     _supportUtf8 = value;
