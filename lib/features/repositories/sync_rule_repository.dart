@@ -222,6 +222,19 @@ class SyncRuleRepository {
       );
     }
 
+    try {
+      // A folder can exist while Android still denies directory enumeration.
+      // Detect that before opening the SFTP connection so the error is useful.
+      await localDirectory.list().isEmpty;
+    } on FileSystemException catch (error) {
+      return SyncRunResult(
+        success: false,
+        message: FailureMessage.from(error, operation: 'Local folder access'),
+        filesChanged: 0,
+        bytesChanged: 0,
+      );
+    }
+
     if (_isDestructiveDeleteRule(rule.deleteRule)) {
       return const SyncRunResult(
         success: false,
@@ -1476,7 +1489,11 @@ class SyncRuleRepository {
       client?.close();
       return SyncRunResult(
         success: false,
-        message: FailureMessage.from(error, operation: 'SFTP Sync'),
+        message: FailureMessage.from(
+          error,
+          operation: 'SFTP Sync',
+          includeDetails: true,
+        ),
         filesChanged: 0,
         bytesChanged: 0,
       );
@@ -1528,7 +1545,11 @@ class SyncRuleRepository {
       client?.close();
       return SyncDeletePreviewResult(
         success: false,
-        message: FailureMessage.from(error, operation: 'SFTP Delete Preview'),
+        message: FailureMessage.from(
+          error,
+          operation: 'SFTP Delete Preview',
+          includeDetails: true,
+        ),
         items: const [],
       );
     }
@@ -1615,7 +1636,11 @@ class SyncRuleRepository {
       client?.close();
       return SyncRunResult(
         success: false,
-        message: FailureMessage.from(error, operation: 'SFTP Delete'),
+        message: FailureMessage.from(
+          error,
+          operation: 'SFTP Delete',
+          includeDetails: true,
+        ),
         filesChanged: 0,
         bytesChanged: 0,
       );

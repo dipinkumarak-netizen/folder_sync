@@ -48,7 +48,12 @@ class BackupPermissionNotifier
   Future<void> requestStoragePermission() async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
-      if (await Permission.storage.request().isDenied) {
+      await Permission.storage.request();
+
+      // Android 11+ ignores READ/WRITE_EXTERNAL_STORAGE for arbitrary shared
+      // folders. Request the all-files setting independently; it must not be
+      // gated by the legacy storage permission result.
+      if (!(await Permission.manageExternalStorage.status).isGranted) {
         await Permission.manageExternalStorage.request();
       }
       return _readState();

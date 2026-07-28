@@ -15,6 +15,7 @@ class FailureMessage {
     Object error, {
     required String operation,
     String? fallback,
+    bool includeDetails = false,
   }) {
     final text = error.toString();
     final lowerText = text.toLowerCase();
@@ -31,10 +32,18 @@ class FailureMessage {
       return '$operation could not reach the FTP server. Check host, port, and network.';
     }
 
-    if (error is FileSystemException ||
-        lowerText.contains('permission denied') ||
-        lowerText.contains('access is denied')) {
+    // SFTP libraries can also throw FileSystemException/"permission denied"
+    // for a remote path. Only classify it as local storage access when the
+    // caller explicitly says the local filesystem is being accessed.
+    if (error is FileSystemException && !operation.startsWith('SFTP')) {
       return '$operation could not access a local file or folder. Check storage permissions.';
+    }
+
+    if (includeDetails &&
+        (lowerText.contains('permission denied') ||
+            lowerText.contains('access is denied') ||
+            error is FileSystemException)) {
+      return '$operation failed: ${error.toString()}';
     }
 
     if (lowerText.contains('login') ||
